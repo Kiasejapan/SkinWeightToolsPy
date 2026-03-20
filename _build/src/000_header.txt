@@ -1,0 +1,24 @@
+# -*- coding: utf-8 -*-
+"""
+DoraSkinWeightTools Python Edition v4.2.0
+Based on DoraSkinWeightImpExp.mel v3.8.1 by DoraYuki
+Maya 2018-2025 (Python 2.7 / 3.x)
+"""
+from __future__ import print_function, division, unicode_literals, absolute_import
+import sys, os, math, time
+
+PY2 = sys.version_info[0] == 2
+if PY2:
+    string_types = (str, unicode)
+    range = xrange
+else:
+    string_types = (str,)
+
+import maya.cmds as cmds
+import maya.mel as mel
+import maya.OpenMaya as om
+import maya.OpenMayaAnim as oma
+
+VERSION = "4.2.0"
+DSW_FORMAT_HEADER = "DoraYuki Skin Weight Format 3.00"
+

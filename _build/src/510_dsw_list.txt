@@ -1,0 +1,14 @@
+# ============================================================================
+# DSW List
+# ============================================================================
+
+def get_dsw_list():
+    items=[]
+    dd=get_dsw_directory()
+    if os.path.isdir(dd):
+        for f in sorted(os.listdir(dd)):
+            if f.lower().endswith(".dsw"): items.append("[File] "+f)
+    for o in (cmds.ls("dsw|*") or []): items.append("[Object] "+o)
+    return items
+
+

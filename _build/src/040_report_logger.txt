@@ -1,0 +1,52 @@
+# ============================================================================
+# Report Logger
+# ============================================================================
+
+class Report(object):
+    """Collects log lines during an operation and shows them in a report window."""
+    _WIN = "DSWPy_ReportWin"
+
+    def __init__(self, title=""):
+        self.title = title
+        self.lines = []
+        self.errors = []
+        self.start_time = time.time()
+
+    def log(self, msg):
+        self.lines.append(msg)
+        print("[Report] " + msg)
+
+    def warn(self, msg):
+        self.lines.append("[WARN] " + msg)
+        print("[Report][WARN] " + msg)
+
+    def error(self, msg):
+        self.errors.append(msg)
+        self.lines.append("[ERROR] " + msg)
+        print("[Report][ERROR] " + msg)
+
+    def summary(self):
+        elapsed = time.time() - self.start_time
+        self.lines.append("")
+        self.lines.append("=== Summary ===")
+        self.lines.append("Time: {0:.2f}s".format(elapsed))
+        if self.errors:
+            self.lines.append("Errors: {0}".format(len(self.errors)))
+            for e in self.errors:
+                self.lines.append("  - " + e)
+        else:
+            self.lines.append("Completed successfully.")
+        return "\n".join(self.lines)
+
+    def show_window(self):
+        """Show report in a scrollable window."""
+        if cmds.window(self._WIN, exists=True):
+            cmds.deleteUI(self._WIN)
+        cmds.window(self._WIN, title=tr("report_title") + " - " + self.title,
+                    wh=(500, 400), s=True)
+        cmds.columnLayout(adj=True)
+        cmds.scrollField(text=self.summary(), ed=False, ww=True, h=360, fn="fixedWidthFont")
+        cmds.setParent("..")
+        cmds.showWindow(self._WIN)
+
+

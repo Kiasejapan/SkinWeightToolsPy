@@ -1,0 +1,89 @@
+# ============================================================================
+# OpenMaya Bulk Weight Helpers
+# ============================================================================
+
+def _get_skin_fn(sc_name):
+    """Get MFnSkinCluster from skinCluster name."""
+    sel = om.MSelectionList(); sel.add(sc_name)
+    obj = om.MObject(); sel.getDependNode(0, obj)
+    return oma.MFnSkinCluster(obj)
+
+def _get_dag_path(node_name):
+    """Get MDagPath from node name."""
+    sel = om.MSelectionList(); sel.add(node_name)
+    dp = om.MDagPath(); sel.getDagPath(0, dp)
+    return dp
+
+def _bulk_get_weights(sc_name, shape_name, vc, num_joints):
+    """Get all skin weights as a flat list using OpenMaya API.
+    Returns list of lists: weights[vtx_index] = [w0, w1, w2, ...]"""
+    try:
+        fn = _get_skin_fn(sc_name)
+        dp = _get_dag_path(shape_name)
+        # Get all vertex components
+        fn_comp = om.MFnSingleIndexedComponent()
+        comp = fn_comp.create(om.MFn.kMeshVertComponent)
+        for i in range(vc):
+            fn_comp.addElement(i)
+        weights = om.MDoubleArray()
+        util = om.MScriptUtil()
+        util.createFromInt(0)
+        inf_count_ptr = util.asUintPtr()
+        fn.getWeights(dp, comp, weights, inf_count_ptr)
+        inf_count = om.MScriptUtil.getUint(inf_count_ptr)
+        # Convert flat array to per-vertex lists
+        result = []
+        for i in range(vc):
+            vw = []
+            for j in range(inf_count):
+                vw.append(weights[i * inf_count + j])
+            result.append(vw)
+        return result
+    except Exception as e:
+        print("[BulkWeights] API failed, falling back to cmds: {0}".format(e))
+        return None
+
+def _bulk_get_positions(shape_name, vc):
+    """Get all vertex world positions using OpenMaya API.
+    Returns list of (x,y,z) tuples."""
+    try:
+        dp = _get_dag_path(shape_name)
+        fn = om.MFnMesh(dp)
+        pts = om.MPointArray()
+        fn.getPoints(pts, om.MSpace.kWorld)
+        result = []
+        for i in range(pts.length()):
+            result.append((pts[i].x, pts[i].y, pts[i].z))
+        return result
+    except Exception as e:
+        print("[BulkPositions] API failed: {0}".format(e))
+        return None
+
+def _bulk_get_uvs(shape_name, vc):
+    """Get first UV coordinate per vertex.
+    Returns list of (u,v) tuples (0,0 if no UV)."""
+    try:
+        result = [(0.0, 0.0)] * vc
+        it_sel = om.MSelectionList()
+        it_sel.add(shape_name)
+        dp = om.MDagPath()
+        it_sel.getDagPath(0, dp)
+        it = om.MItMeshVertex(dp)
+        util_u = om.MScriptUtil(); util_u.createFromDouble(0.0)
+        util_v = om.MScriptUtil(); util_v.createFromDouble(0.0)
+        while not it.isDone():
+            idx = it.index()
+            uv_u = om.MScriptUtil(); uv_u.createFromDouble(0.0); ptr_u = uv_u.asFloatPtr()
+            uv_v = om.MScriptUtil(); uv_v.createFromDouble(0.0); ptr_v = uv_v.asFloatPtr()
+            try:
+                it.getUV(ptr_u, ptr_v)
+                result[idx] = (om.MScriptUtil.getFloat(ptr_u), om.MScriptUtil.getFloat(ptr_v))
+            except Exception:
+                pass
+            it.next()
+        return result
+    except Exception as e:
+        print("[BulkUVs] API failed: {0}".format(e))
+        return None
+
+

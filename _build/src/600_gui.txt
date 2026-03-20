@@ -1,0 +1,348 @@
+# ============================================================================
+# GUI
+# ============================================================================
+
+class DoraSkinWeightUI(object):
+    WIN = "DSWPy_Win"
+    JNE_WIN = "DSWPy_JNE"
+    HTU_WIN = "DSWPy_HTU"
+
+    def __init__(self):
+        self.import_mode = 1  # default: XYZ
+        self._jno=[]; self._jnn=[]
+
+    def show(self):
+        if cmds.window(self.WIN,exists=True): cmds.deleteUI(self.WIN)
+        cmds.window(self.WIN, title=tr("win_title").format(VERSION), wh=(360,560), s=True)
+        root=cmds.columnLayout(adj=True)
+
+        # === Header ===
+        cmds.rowLayout(nc=4, adj=2, h=30, bgc=(0.22,0.22,0.22),
+                       cat=[(1,'left',6),(3,'right',4),(4,'right',6)], cw=[(1,100),(3,80),(4,80)])
+        cmds.text(label=tr("lang_label"), fn="smallPlainLabelFont")
+        self.lang_menu=cmds.optionMenu(h=22,w=80,cc=self._on_lang)
+        cmds.menuItem(label="English"); cmds.menuItem(label="\u65e5\u672c\u8a9e")
+        if _LANG=="ja": cmds.optionMenu(self.lang_menu,e=True,sl=2)
+        cmds.text(label="")
+        cmds.button(label=tr("how_to_use"),h=22,w=80,c=lambda*a:self._htu())
+        cmds.setParent(root)
+
+        # === Status bar ===
+        cmds.text(_STATUS_CTRL, label="Ready", h=20, al="center", bgc=(0.25,0.25,0.25))
+
+        # === Tabs ===
+        self.tabs=cmds.tabLayout("DSWPy_Tabs")
+
+        # ---- Import ----
+        ifl=cmds.formLayout()
+        il=cmds.text(label=tr("dsw_list"),al="left",h=20)
+        self.il=cmds.textScrollList("DSWPy_IL",h=80,sc=self._imp_sel)
+        self.inf=cmds.textField("DSWPy_INF",vis=False)
+        iml=cmds.text(label=tr("import_mode"),h=20)
+        self.irc=cmds.radioCollection()
+        r1=cmds.radioButton(label=tr("vertex_order"),h=20,onc=lambda*a:self._sim(0))
+        r2=cmds.radioButton(label=tr("xyz_position"),sl=True,h=20,onc=lambda*a:self._sim(1))
+        r3=cmds.radioButton(label=tr("uv_position"),h=20,onc=lambda*a:self._sim(2))
+        al=cmds.text(label=tr("accuracy"),h=20)
+        self.af=cmds.floatField(v=0.001,pre=6,w=80,h=20)
+        self.icb=cmds.checkBox(label=tr("interpolate"),v=False,h=20,
+                               onc=lambda*a:self._iic(True),ofc=lambda*a:self._iic(False))
+        self.iirc=cmds.radioCollection()
+        self.ir1=cmds.radioButton(label="XYZ",sl=True,en=False,h=20)
+        self.ir2=cmds.radioButton(label="UV",en=False,h=20)
+        self.bcb=cmds.checkBox(label=tr("bind_skin"),v=False,h=20)
+        bj=cmds.button(label=tr("edit_jointmap"),h=24,w=130,c=lambda*a:self._jne())
+        bi=cmds.button(label=tr("import_dsw"),h=28,c=lambda*a:self._do_imp())
+        sp=cmds.separator(h=8,st="in")
+        bv=cmds.button(label=tr("vtx_paste"),h=28,bgc=(0.4,0.6,0.4),c=lambda*a:self._do_vp())
+        cmds.formLayout(ifl,e=True,
+            af=[(il,"top",8),(il,"left",4),(il,"right",4),(self.il,"left",4),(self.il,"right",4),
+                (iml,"left",4),(r1,"left",4),(r2,"left",4),(r3,"left",4),(al,"left",4),
+                (self.icb,"left",4),(self.bcb,"left",4),(bj,"left",4),
+                (bi,"left",4),(bi,"right",4),(sp,"left",4),(sp,"right",4),
+                (bv,"left",4),(bv,"right",4),(bv,"bottom",4)],
+            ac=[(self.il,"top",2,il),(self.il,"bottom",4,iml),
+                (iml,"bottom",0,r1),(r1,"bottom",0,r2),(r2,"bottom",0,r3),(r3,"bottom",6,al),
+                (al,"bottom",6,self.icb),(self.af,"left",8,al),(self.af,"bottom",6,self.icb),
+                (self.icb,"bottom",6,self.bcb),
+                (self.ir1,"left",8,self.icb),(self.ir1,"bottom",6,self.bcb),
+                (self.ir2,"left",4,self.ir1),(self.ir2,"bottom",6,self.bcb),
+                (self.bcb,"bottom",6,bj),(bj,"bottom",6,bi),(bi,"bottom",4,sp),(sp,"bottom",4,bv)])
+        cmds.setParent("..")
+
+        # ---- Export ----
+        efl=cmds.formLayout()
+        el2=cmds.text(label=tr("dsw_list"),al="left",h=20)
+        self.el=cmds.textScrollList("DSWPy_EL",h=100,sc=self._exp_sel)
+        enl=cmds.text(label=tr("export_dsw_name"),al="left",h=20)
+        self.enf=cmds.textField("DSWPy_ENF",h=20,tx="1st")
+        bef=cmds.button(label=tr("export_file"),h=28,c=lambda*a:self._do_exp("[File]"))
+        beo=cmds.button(label=tr("export_object"),h=28,c=lambda*a:self._do_exp("[Object]"))
+        spe=cmds.separator(h=8,st="in")
+        bdel=cmds.button(label=tr("delete_dsw"),h=28,bgc=(0.6,0.3,0.3),c=lambda*a:self._do_del())
+        cmds.formLayout(efl,e=True,
+            af=[(el2,"top",8),(el2,"left",4),(el2,"right",4),
+                (self.el,"left",4),(self.el,"right",4),(enl,"left",4),
+                (self.enf,"left",4),(self.enf,"right",4),
+                (bef,"left",4),(bef,"right",4),(beo,"left",4),(beo,"right",4),
+                (spe,"left",4),(spe,"right",4),
+                (bdel,"left",4),(bdel,"right",4),(bdel,"bottom",4)],
+            ac=[(self.el,"top",2,el2),(self.el,"bottom",4,enl),
+                (enl,"bottom",2,self.enf),(self.enf,"bottom",8,bef),
+                (bef,"bottom",4,beo),(beo,"bottom",8,spe),(spe,"bottom",4,bdel)])
+        cmds.setParent("..")
+
+        # ---- Body Fit (BETA) ----
+        btfl=cmds.formLayout()
+        btt=cmds.text(label=tr("bf_title"),al="center",h=24,fn="boldLabelFont")
+        bsl=cmds.text(label=tr("bf_source"),al="left",h=20)
+        self.bsf=cmds.textField(h=24)
+        bsb=cmds.button(label=tr("bf_set_selected"),h=24,w=110,c=lambda*a:self._sbt("s"))
+        btl=cmds.text(label=tr("bf_target"),al="left",h=20)
+        self.btf=cmds.textField(h=24)
+        btb=cmds.button(label=tr("bf_set_selected"),h=24,w=110,c=lambda*a:self._sbt("t"))
+        bf_sep=cmds.separator(h=8,st="in")
+        btn_fit=cmds.button(label=tr("bf_fit"),h=36,bgc=(0.5,0.35,0.6),c=lambda*a:self._do_bf_fit())
+        bf_sep2=cmds.separator(h=6,st="in")
+        btn_rst=cmds.button(label=tr("bf_reset"),h=30,bgc=(0.55,0.35,0.35),c=lambda*a:self._do_bf_reset())
+        bth=cmds.text(label=tr("bf_help"),al="left",h=90,ww=True)
+        cmds.formLayout(btfl,e=True,
+            af=[(btt,"top",8),(btt,"left",4),(btt,"right",4),(bsl,"left",4),
+                (self.bsf,"left",4),(bsb,"right",4),(btl,"left",4),
+                (self.btf,"left",4),(btb,"right",4),
+                (bf_sep,"left",4),(bf_sep,"right",4),
+                (btn_fit,"left",4),(btn_fit,"right",4),
+                (bf_sep2,"left",4),(bf_sep2,"right",4),
+                (btn_rst,"left",4),(btn_rst,"right",4),
+                (bth,"left",8),(bth,"right",8),(bth,"bottom",8)],
+            ac=[(bsl,"top",8,btt),(self.bsf,"top",2,bsl),(self.bsf,"right",4,bsb),(bsb,"top",2,bsl),
+                (btl,"top",12,self.bsf),(self.btf,"top",2,btl),(self.btf,"right",4,btb),(btb,"top",2,btl),
+                (bf_sep,"top",12,self.btf),
+                (btn_fit,"top",8,bf_sep),
+                (bf_sep2,"top",8,btn_fit),
+                (btn_rst,"top",4,bf_sep2),
+                (bth,"top",12,btn_rst)])
+        cmds.setParent("..")
+
+        # ---- Data Check ----
+        cfl=cmds.formLayout()
+
+        # Section 1: Weight Decimal Check
+        dt1=cmds.text(label=tr("decimal_title"),al="left",h=18,fn="boldLabelFont")
+        dd1=cmds.text(label=tr("decimal_desc"),al="left",h=16,fn="smallPlainLabelFont")
+        ctl=cmds.text(label=tr("digit_unit"),h=20)
+        self.ctf=cmds.floatField(v=0.01,pre=4,w=70,h=20)
+        b_dig=cmds.button(label=tr("check_digit"),h=22,w=70,c=lambda*a:self._do_chk_dig())
+        b_cln=cmds.button(label=tr("clean_digit"),h=22,w=100,bgc=(0.4,0.55,0.7),c=lambda*a:self._do_clean_dig())
+
+        sep_c1=cmds.separator(h=10,st="in")
+
+        # Section 2: Influence Count Check
+        it1=cmds.text(label=tr("inf_title"),al="left",h=18,fn="boldLabelFont")
+        id1=cmds.text(label=tr("inf_desc"),al="left",h=16,fn="smallPlainLabelFont")
+        iml=cmds.text(label=tr("inf_max"),h=20)
+        self.inf_f=cmds.intField(v=4,min=1,max=20,w=40,h=20)
+        b_inf=cmds.button(label=tr("check_inf"),h=22,w=70,c=lambda*a:self._do_chk_inf())
+
+        sep_c2=cmds.separator(h=10,st="in")
+
+        # Section 3: Same Position Check
+        b_same=cmds.button(label=tr("check_samepos"),h=28,c=lambda*a:check_same_position())
+
+        sep_c3=cmds.separator(h=10,st="in")
+
+        # Section 4: Create Joint Set
+        b_set=cmds.button(label=tr("create_set"),h=28,c=lambda*a:create_skin_joint_set())
+
+        cmds.formLayout(cfl,e=True,
+            af=[(dt1,"top",8),(dt1,"left",4),(dt1,"right",4),
+                (dd1,"left",4),(dd1,"right",4),
+                (ctl,"left",4),(self.ctf,"left",4),
+                (b_cln,"right",4),
+                (sep_c1,"left",4),(sep_c1,"right",4),
+                (it1,"left",4),(it1,"right",4),
+                (id1,"left",4),(id1,"right",4),
+                (iml,"left",4),
+                (sep_c2,"left",4),(sep_c2,"right",4),
+                (b_same,"left",4),(b_same,"right",4),
+                (sep_c3,"left",4),(sep_c3,"right",4),
+                (b_set,"left",4),(b_set,"right",4)],
+            ac=[(dd1,"top",2,dt1),
+                (ctl,"top",4,dd1),
+                (self.ctf,"top",4,dd1),(self.ctf,"left",6,ctl),
+                (b_dig,"top",4,dd1),(b_dig,"left",6,self.ctf),
+                (b_cln,"top",4,dd1),(b_cln,"left",4,b_dig),
+                (sep_c1,"top",8,ctl),
+                (it1,"top",8,sep_c1),
+                (id1,"top",2,it1),
+                (iml,"top",4,id1),
+                (self.inf_f,"top",4,id1),(self.inf_f,"left",6,iml),
+                (b_inf,"top",4,id1),(b_inf,"left",6,self.inf_f),
+                (sep_c2,"top",8,iml),
+                (b_same,"top",8,sep_c2),
+                (sep_c3,"top",8,b_same),
+                (b_set,"top",8,sep_c3)])
+        cmds.setParent("..")
+
+        cmds.tabLayout(self.tabs,e=True,
+            tabLabel=[(ifl,tr("tab_import")),(efl,tr("tab_export")),
+                      (btfl,tr("tab_body_fit")),(cfl,tr("tab_check"))],
+            cc=self._rl)
+        cmds.setParent("..")
+        self._rl()
+        cmds.showWindow(self.WIN)
+        print("Dora SkinWeight Tools Py v"+VERSION)
+
+    # -- Language --
+    def _on_lang(self, v):
+        set_language("ja" if v=="\u65e5\u672c\u8a9e" else "en")
+        cmds.evalDeferred(self.show)
+
+    # -- How To Use --
+    def _htu(self):
+        if cmds.window(self.HTU_WIN,exists=True): cmds.deleteUI(self.HTU_WIN)
+        cmds.window(self.HTU_WIN,title=tr("htu_title"),wh=(520,500),s=True)
+        cmds.columnLayout(adj=True)
+        cmds.scrollField(text=tr("htu_content",ver=VERSION),ed=False,ww=True,h=460,fn="fixedWidthFont")
+        cmds.showWindow(self.HTU_WIN)
+
+    # -- Lists --
+    def _rl(self,*a):
+        items=get_dsw_list()
+        cmds.textScrollList(self.il,e=True,ra=True)
+        cmds.textScrollList(self.el,e=True,ra=True)
+        for it in items:
+            cmds.textScrollList(self.il,e=True,a=it)
+            cmds.textScrollList(self.el,e=True,a=it)
+    def _imp_sel(self,*a):
+        s=cmds.textScrollList(self.il,q=True,si=True) or []
+        if s: cmds.textField(self.inf,e=True,tx=s[0])
+    def _exp_sel(self,*a):
+        s=cmds.textScrollList(self.el,q=True,si=True) or []
+        if s:
+            p=s[0].split(" ",1)
+            cmds.textField(self.enf,e=True,tx=p[1] if len(p)>1 else p[0])
+    def _sim(self,m):
+        self.import_mode=m; cmds.floatField(self.af,e=True,en=(m!=0))
+    def _iic(self,on):
+        cmds.radioButton(self.ir1,e=True,en=on); cmds.radioButton(self.ir2,e=True,en=on)
+    def _sbt(self,w):
+        s=cmds.ls(sl=True) or []
+        if not s: show_status(tr("warn_no_sel"),True); return
+        if w=="s": cmds.textField(self.bsf,e=True,tx=s[0])
+        else: cmds.textField(self.btf,e=True,tx=s[0])
+    def _gjm(self):
+        jm=None
+        if self._jno and self._jnn:
+            jm={o:n for o,n in zip(self._jno,self._jnn) if o!=n}
+        return jm if jm else None
+
+    # -- Actions --
+    def _do_imp(self):
+        dn=cmds.textField(self.inf,q=True,tx=True)
+        if not dn: show_status(tr("warn_no_dsw"),True); return
+        ip=cmds.checkBox(self.icb,q=True,v=True)
+        iim=1 if cmds.radioButton(self.ir1,q=True,sl=True) else 2
+        ac=cmds.floatField(self.af,q=True,v=True)
+        bs=cmds.checkBox(self.bcb,q=True,v=True)
+        mw=cmds.floatField(self.ctf,q=True,v=True) if cmds.floatField(self.ctf,exists=True) else 0.01
+        dsw_import(dn,self.import_mode,ip,iim,ac,bs,self._gjm(),min_w=mw,show_report=True); self._rl()
+
+    def _do_exp(self, mode):
+        n=cmds.textField(self.enf,q=True,tx=True)
+        if not n:
+            show_status(tr("warn_no_name"),True); return
+        dsw_export("{0} {1}".format(mode,n)); self._rl()
+
+    def _do_del(self):
+        s=cmds.textScrollList(self.el,q=True,si=True) or []
+        if not s: show_status(tr("warn_no_dsw"),True); return
+        r=cmds.confirmDialog(title="Delete DSW", message=tr("warn_delete_confirm").format(s[0]),
+                             button=["OK","Cancel"], defaultButton="Cancel", cancelButton="Cancel")
+        if r=="OK":
+            delete_dsw(s[0]); self._rl()
+
+    def _do_vp(self):
+        dn=cmds.textField(self.inf,q=True,tx=True)
+        if not dn: show_status(tr("warn_no_dsw"),True); return
+        ac=cmds.floatField(self.af,q=True,v=True)
+        mw=cmds.floatField(self.ctf,q=True,v=True) if cmds.floatField(self.ctf,exists=True) else 0.01
+        vertex_paste_weights(dn,self.import_mode,ac,self._gjm(),min_w=mw)
+
+    def _do_bf_fit(self):
+        s=cmds.textField(self.bsf,q=True,tx=True)
+        t=cmds.textField(self.btf,q=True,tx=True)
+        if not s or not t: show_status(tr("warn_set_both"),True); return
+        body_fit_joints(s, t)
+
+    def _do_bf_reset(self):
+        body_fit_reset()
+
+    def _do_chk_dig(self):
+        u=cmds.floatField(self.ctf,q=True,v=True)
+        check_weight_digit(u)
+
+    def _do_clean_dig(self):
+        u=cmds.floatField(self.ctf,q=True,v=True)
+        clean_weight_digit(u)
+
+    def _do_chk_inf(self):
+        n=cmds.intField(self.inf_f,q=True,v=True)
+        check_influence_count(n)
+
+    # -- Joint Editor --
+    def _jne(self):
+        dn=cmds.textField(self.inf,q=True,tx=True)
+        if not dn: show_status(tr("warn_no_dsw"),True); return
+        dl=read_dsw(dn)
+        if not dl: return
+        self._jno=[simple_obj_name(j) for j in dl[1].split(",")]
+        self._jnn=list(self._jno)
+        if cmds.window(self.JNE_WIN,exists=True): cmds.deleteUI(self.JNE_WIN)
+        cmds.window(self.JNE_WIN,title=tr("jne_title"),wh=(450,400),s=True)
+        mf=cmds.formLayout()
+        inf=cmds.text(label="{0} - {1} joints".format(dn,len(self._jno)),h=20)
+        self.jl=cmds.textScrollList("DSWPy_JL",h=200,ams=True,sc=self._jne_sel)
+        cl=cmds.columnLayout(adj=True,w=160)
+        cmds.text(label=tr("jne_joint_name"),h=18); self.jnf=cmds.textField(h=24)
+        cmds.button(label=tr("jne_set"),h=24,c=lambda*a:self._jne_sn()); cmds.separator(h=8)
+        cmds.text(label=tr("jne_search"),h=18); self.jsf=cmds.textField(h=24)
+        cmds.text(label=tr("jne_replace"),h=18); self.jrf=cmds.textField(h=24)
+        cmds.button(label=tr("jne_substitution"),h=24,c=lambda*a:self._jne_sub()); cmds.separator(h=8)
+        cmds.text(label=tr("jne_prefix"),h=18); self.jpf=cmds.textField(h=24)
+        cmds.text(label=tr("jne_suffix"),h=18); self.jxf=cmds.textField(h=24)
+        cmds.button(label=tr("jne_add_ps"),h=24,c=lambda*a:self._jne_aps()); cmds.separator(h=8)
+        cmds.button(label=tr("jne_reset"),h=24,c=lambda*a:self._jne_rst())
+        cmds.setParent("..")
+        cmds.formLayout(mf,e=True,
+            af=[(inf,"top",8),(inf,"left",4),(self.jl,"left",4),(self.jl,"bottom",4),
+                (cl,"right",4),(cl,"top",30)],
+            ac=[(self.jl,"top",4,inf),(self.jl,"right",4,cl)])
+        self._jne_upd(); cmds.showWindow(self.JNE_WIN)
+
+    def _jne_upd(self):
+        cmds.textScrollList(self.jl,e=True,ra=True)
+        for o,n in zip(self._jno,self._jnn):
+            cmds.textScrollList(self.jl,e=True,a="[{0}] -> [{1}]".format(o,n))
+    def _jne_sel(self,*a):
+        s=cmds.textScrollList(self.jl,q=True,sii=True) or []
+        if s: cmds.textField(self.jnf,e=True,tx=self._jnn[s[0]-1])
+    def _jne_sn(self):
+        s=cmds.textScrollList(self.jl,q=True,sii=True) or []
+        nn=cmds.textField(self.jnf,q=True,tx=True)
+        for i in s: self._jnn[i-1]=nn
+        self._jne_upd()
+    def _jne_sub(self):
+        sr=cmds.textField(self.jsf,q=True,tx=True); rp=cmds.textField(self.jrf,q=True,tx=True)
+        s=cmds.textScrollList(self.jl,q=True,sii=True) or []
+        for i in s: self._jnn[i-1]=self._jnn[i-1].replace(sr,rp)
+        self._jne_upd()
+    def _jne_aps(self):
+        px=cmds.textField(self.jpf,q=True,tx=True); sx=cmds.textField(self.jxf,q=True,tx=True)
+        s=cmds.textScrollList(self.jl,q=True,sii=True) or []
+        for i in s: self._jnn[i-1]=px+self._jnn[i-1]+sx
+        self._jne_upd()
+    def _jne_rst(self):
+        self._jnn=list(self._jno); self._jne_upd()
+
+

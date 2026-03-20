@@ -1,0 +1,62 @@
+# ============================================================================
+# Utility Functions
+# ============================================================================
+
+def vtx_to_uv(vtx):
+    try:
+        uv_list = cmds.polyListComponentConversion(vtx, fv=True, tuv=True)
+        if uv_list:
+            return uv_list[0].replace(".map", ".uv") if ".map" in uv_list[0] else uv_list[0]
+    except Exception: pass
+    return ""
+
+def get_shape(obj):
+    """Get non-intermediate mesh shape from obj. Works with transforms, groups, references."""
+    def _is_intermediate(node):
+        try: return cmds.getAttr(node + ".intermediateObject")
+        except Exception: return False
+
+    # Direct children shapes (most common case)
+    shapes = cmds.listRelatives(obj, shapes=True, fullPath=True, type="mesh") or []
+    for s in shapes:
+        if not _is_intermediate(s): return s
+    # listHistory fallback (for direct transform with deformers)
+    h = cmds.listHistory(obj) or []
+    for node in cmds.ls(h, type="mesh") or []:
+        if not _is_intermediate(node): return node
+    # Group node: search descendants for skinned mesh
+    descs = cmds.listRelatives(obj, allDescendents=True, fullPath=True, type="mesh") or []
+    for d in descs:
+        if _is_intermediate(d): continue
+        if get_skin_cluster(d): return d
+    # Any non-intermediate descendant mesh
+    for d in descs:
+        if not _is_intermediate(d): return d
+    return ""
+
+def get_skin_cluster(mesh_shape):
+    h = cmds.listHistory(mesh_shape)
+    if h:
+        s = cmds.ls(h, type="skinCluster")
+        if s: return s[0]
+    return ""
+
+def simple_obj_name(n): return n.split("|")[-1]
+
+def check_overlaps(nl):
+    from collections import Counter
+    c = Counter(nl); d = {k:v for k,v in c.items() if v>1}
+    if not d: return ""
+    return ", ".join(["{0}({1})".format(k,v) for k,v in d.items()])
+
+def ext_check(n, ext):
+    if not n.lower().endswith(ext.lower()): return n+ext
+    return n
+
+def get_joint_list_from_sc(sc):
+    return [simple_obj_name(j) for j in (cmds.listConnections(sc+".matrix", type="joint") or [])]
+
+def get_dsw_directory():
+    return os.path.join(cmds.workspace(q=True, fn=True), "dsw")
+
+

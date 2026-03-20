@@ -1,0 +1,30 @@
+# ============================================================================
+# Status Line (in-tool message display)
+# ============================================================================
+
+_STATUS_CTRL = "DSWPy_StatusText"
+
+def show_status(msg, is_error=False):
+    """Show message in the tool's status area and print to script editor."""
+    print(msg)
+    if cmds.text(_STATUS_CTRL, exists=True):
+        color = (0.9, 0.3, 0.3) if is_error else (0.7, 0.9, 0.7)
+        cmds.text(_STATUS_CTRL, e=True, label=msg, bgc=color)
+
+
+def show_check_result(title, found_count, total_count, details=""):
+    """Show a dialog with check results."""
+    if found_count == 0:
+        icon = "information"
+        msg = "OK - No problems found.\n\nChecked: {0} vertices".format(total_count)
+        if details:
+            msg += "\n" + details
+    else:
+        icon = "warning"
+        msg = "Found {0} problem vertices.\n\nChecked: {1} vertices\n{0} vertices selected.".format(
+            found_count, total_count)
+        if details:
+            msg += "\n" + details
+    cmds.confirmDialog(title=title, message=msg, button=["OK"], icon=icon)
+
+

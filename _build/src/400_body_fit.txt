@@ -1,0 +1,214 @@
+# ============================================================================
+# Body Fit (BETA) - Fit skeleton A to body B shape
+# ============================================================================
+
+# Stores original joint positions for reset
+_body_fit_original = {}
+_body_fit_dup_root = None
+
+def _is_intermediate_shape(node):
+    try: return cmds.getAttr(node + ".intermediateObject")
+    except Exception: return False
+
+def _strip_ns(name):
+    """Strip namespace: 'NS:joint1' -> 'joint1'"""
+    return name.split(":")[-1] if ":" in name else name
+
+
+def _get_all_joints_from_group(root):
+    """Get all joints from skinClusters under root group."""
+    def _is_intermediate(n):
+        try: return cmds.getAttr(n + ".intermediateObject")
+        except Exception: return False
+
+    meshes = cmds.listRelatives(root, allDescendents=True, fullPath=True, type="mesh") or []
+    all_joints = set()
+    for m in meshes:
+        if _is_intermediate(m): continue
+        sc = get_skin_cluster(m)
+        if sc:
+            for j in (cmds.skinCluster(sc, q=True, inf=True) or []):
+                lr = cmds.ls(j, long=True)
+                if lr: all_joints.add(lr[0])
+    return sorted(all_joints)
+
+
+def _get_all_joints(root):
+    """Get all joints under root. Root can be a joint, transform, or group.
+    Returns list of long-name joint paths."""
+    if not cmds.objExists(root):
+        return []
+    node_type = cmds.nodeType(root)
+    joints = set()
+    # If root itself is a joint, include it
+    if node_type == "joint":
+        lr = cmds.ls(root, long=True)
+        if lr: joints.add(lr[0])
+    # Get all descendant joints
+    descs = cmds.listRelatives(root, allDescendents=True, fullPath=True, type="joint") or []
+    for j in descs:
+        lr = cmds.ls(j, long=True)
+        if lr: joints.add(lr[0])
+    return sorted(joints)
+
+
+def body_fit_joints(src, tgt):
+    """Fit A's skeleton to match B's skeleton by joint name.
+    Input: root joints or groups containing joints.
+    Matched joints are moved to B's position.
+    Unmatched joints (e.g. extra swing bones) are skipped.
+    Stores originals for reset."""
+    global _body_fit_original, _body_fit_dup_root
+    _body_fit_dup_root = None
+    rpt = Report("Body Fit")
+    rpt.log("Source (A): {0}".format(src))
+    rpt.log("Target (B): {0}".format(tgt))
+    st = time.time()
+
+    if not cmds.objExists(src):
+        rpt.error("A not found: " + src); rpt.show_window(); return 0
+    if not cmds.objExists(tgt):
+        rpt.error("B not found: " + tgt); rpt.show_window(); return 0
+
+    # Get joints from A and B (works with joint roots, groups, or mesh groups)
+    a_joints = _get_all_joints(src)
+    if not a_joints:
+        # Fallback: try skinCluster-based search
+        a_joints = _get_all_joints_from_group(src)
+    if not a_joints:
+        rpt.error("No joints found under A."); rpt.show_window(); return 0
+
+    b_joints = _get_all_joints(tgt)
+    if not b_joints:
+        b_joints = _get_all_joints_from_group(tgt)
+    if not b_joints:
+        rpt.error("No joints found under B."); rpt.show_window(); return 0
+
+    rpt.log("A joints: {0}".format(len(a_joints)))
+    rpt.log("B joints: {0}".format(len(b_joints)))
+
+    # Read positions
+    a_pos = {}
+    for j in a_joints:
+        try: a_pos[j] = cmds.xform(j, q=True, ws=True, t=True)
+        except Exception: pass
+
+    b_pos = {}
+    for j in b_joints:
+        try: b_pos[j] = cmds.xform(j, q=True, ws=True, t=True)
+        except Exception: pass
+
+    # Store originals for reset
+    _body_fit_original = {}
+    for j, p in a_pos.items():
+        _body_fit_original[j] = list(p)
+
+    # Build B lookup by bare name
+    b_by_bare = {}
+    for j, p in b_pos.items():
+        bare = _strip_ns(simple_obj_name(j))
+        b_by_bare[bare] = p
+
+    # Match A joints to B by bare name
+    matched = {}     # A_joint -> B_position
+    unmatched = []
+    for j in a_joints:
+        a_bare = _strip_ns(simple_obj_name(j))
+        if a_bare in b_by_bare:
+            matched[j] = b_by_bare[a_bare]
+        else:
+            unmatched.append(j)
+
+    rpt.log("Matched: {0}  Skipped: {1}".format(len(matched), len(unmatched)))
+    if unmatched:
+        rpt.log("Skipped joints (no match in B):")
+        for u in unmatched[:15]:
+            rpt.log("  - {0}".format(_strip_ns(simple_obj_name(u))))
+        if len(unmatched) > 15:
+            rpt.log("  ... and {0} more".format(len(unmatched) - 15))
+
+    # Disable skinCluster envelopes connected to A's joints
+    skin_clusters = set()
+    for j in a_joints:
+        conns = cmds.listConnections(j, type="skinCluster") or []
+        for skc in conns:
+            skin_clusters.add(skc)
+    env_off = 0
+    for skc in skin_clusters:
+        try:
+            cmds.setAttr(skc + ".envelope", 0)
+            env_off += 1
+        except Exception:
+            pass
+    if skin_clusters:
+        rpt.log("Envelopes disabled: {0}/{1}".format(env_off, len(skin_clusters)))
+
+    # Move matched A joints to B positions
+    progress_start("Fitting joints...", len(matched))
+    moved = 0
+    failed = 0
+    for j in sorted(matched.keys(), key=_jnt_depth):
+        progress_update(1)
+        new_pos = matched[j]
+        try:
+            cmds.xform(j, ws=True, t=new_pos)
+            actual = cmds.xform(j, q=True, ws=True, t=True)
+            dist = sum((actual[a] - new_pos[a])**2 for a in range(3))**0.5
+            if dist < 0.5:
+                moved += 1
+            else:
+                failed += 1
+        except Exception:
+            failed += 1
+    progress_end()
+
+    # Re-enable envelopes
+    for skc in skin_clusters:
+        try: cmds.setAttr(skc + ".envelope", 1)
+        except Exception: pass
+
+    elapsed = time.time() - st
+    rpt.log("")
+    rpt.log("Moved: {0}/{1} matched  Skipped: {2}  Failed: {3}".format(
+        moved, len(matched), len(unmatched), failed))
+    rpt.log("Time: {0:.2f}s".format(elapsed))
+    if moved == 0:
+        rpt.error("No joints could be moved.")
+
+    if rpt.errors:
+        show_status("Body Fit errors - see report", True)
+    else:
+        show_status("Body Fit: {0} moved, {1} skipped ({2:.1f}s)".format(
+            moved, len(unmatched), elapsed))
+    rpt.show_window()
+    return 1
+
+
+def body_fit_reset():
+    """Reset skeleton to bind pose using GoToBindPose MEL command."""
+    global _body_fit_original, _body_fit_dup_root
+
+    if _body_fit_dup_root and cmds.objExists(_body_fit_dup_root):
+        cmds.delete(_body_fit_dup_root)
+        _body_fit_dup_root = None
+
+    _body_fit_original = {}
+
+    try:
+        mel.eval("GoToBindPose;")
+        show_status("GoToBindPose done.")
+    except Exception as e:
+        show_status("GoToBindPose failed: {0}".format(e), True)
+        return 0
+    return 1
+
+
+
+def _jnt_depth(j):
+    d = 0
+    p = cmds.listRelatives(j, parent=True, type='joint', fullPath=True)
+    while p:
+        d += 1; p = cmds.listRelatives(p[0], parent=True, type='joint', fullPath=True)
+    return d
+
+

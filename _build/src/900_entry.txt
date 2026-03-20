@@ -1,0 +1,8 @@
+# ============================================================================
+# Entry Point
+# ============================================================================
+_ui=None
+def launch():
+    global _ui; _ui=DoraSkinWeightUI(); _ui.show()
+def DoraSkinWeightToolsPy(): launch()
+if __name__=="__main__": launch()

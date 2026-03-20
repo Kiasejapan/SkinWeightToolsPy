@@ -1,0 +1,26 @@
+# ============================================================================
+# Progress Window (custom, in-tool)
+# ============================================================================
+
+_PROG_WIN = "DSWPy_ProgressWindow"
+
+def progress_start(title, max_val):
+    if cmds.window(_PROG_WIN, exists=True): cmds.deleteUI(_PROG_WIN)
+    cmds.window(_PROG_WIN, title=title, wh=(320, 70), sizeable=False, tlb=True)
+    cmds.columnLayout(adj=True)
+    cmds.text("DSWPy_ProgLabel", label=title, h=20, al="center")
+    cmds.progressBar("DSWPy_ProgBar", maxValue=max(max_val, 1), width=300, h=22)
+    cmds.showWindow(_PROG_WIN)
+    cmds.refresh(force=True)
+
+def progress_update(step=1, label=None):
+    if cmds.progressBar("DSWPy_ProgBar", exists=True):
+        cmds.progressBar("DSWPy_ProgBar", e=True, step=step)
+    if label and cmds.text("DSWPy_ProgLabel", exists=True):
+        cmds.text("DSWPy_ProgLabel", e=True, label=label)
+    cmds.refresh(force=True)
+
+def progress_end():
+    if cmds.window(_PROG_WIN, exists=True): cmds.deleteUI(_PROG_WIN)
+
+

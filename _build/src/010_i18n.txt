@@ -1,0 +1,144 @@
+# ============================================================================
+# i18n
+# ============================================================================
+_LANG = "en"
+
+_S = {
+    "win_title":        {"en":"Dora SkinWeight Py v{0}", "ja":"Dora SkinWeight Py v{0}"},
+    "lang_label":       {"en":"Language :", "ja":"Language /\u8a00\u8a9e:"},
+    "how_to_use":       {"en":"How to Use", "ja":"How to Use"},
+    "tab_import":       {"en":"Import", "ja":"\u30a4\u30f3\u30dd\u30fc\u30c8"},
+    "tab_export":       {"en":"Export", "ja":"\u30a8\u30af\u30b9\u30dd\u30fc\u30c8"},
+    "tab_body_fit":     {"en":"Body Fit (BETA)", "ja":"\u4f53\u578b\u5408\u308f\u305b (BETA)"},
+    "tab_check":        {"en":"Data Check", "ja":"\u30c7\u30fc\u30bf\u30c1\u30a7\u30c3\u30af"},
+    "dsw_list":         {"en":"DSW List", "ja":"DSW \u30ea\u30b9\u30c8"},
+    "import_mode":      {"en":"Import Mode", "ja":"\u30a4\u30f3\u30dd\u30fc\u30c8\u30e2\u30fc\u30c9"},
+    "vertex_order":     {"en":"Vertex Order", "ja":"\u9802\u70b9\u756a\u53f7\u9806"},
+    "xyz_position":     {"en":"XYZ Position", "ja":"XYZ \u5ea7\u6a19"},
+    "uv_position":      {"en":"UV Position", "ja":"UV \u5ea7\u6a19"},
+    "accuracy":         {"en":"Accuracy", "ja":"\u7cbe\u5ea6"},
+    "interpolate":      {"en":"Interpolate", "ja":"\u88dc\u9593"},
+    "bind_skin":        {"en":"Bind Skin", "ja":"\u30d0\u30a4\u30f3\u30c9\u30b9\u30ad\u30f3"},
+    "edit_jointmap":    {"en":"Edit JointMap", "ja":"\u30b8\u30e7\u30a4\u30f3\u30c8\u30de\u30c3\u30d7\u7de8\u96c6"},
+    "import_dsw":       {"en":"Import DSW", "ja":"DSW \u30a4\u30f3\u30dd\u30fc\u30c8"},
+    "vtx_paste":        {"en":"Vertex Paste (Selected Vertices Only)",
+                         "ja":"\u9802\u70b9\u30da\u30fc\u30b9\u30c8\uff08\u9078\u629e\u9802\u70b9\u306e\u307f\uff09"},
+    "export_dsw_name":  {"en":"Export DSW Name", "ja":"\u30a8\u30af\u30b9\u30dd\u30fc\u30c8DSW\u540d"},
+    "export_file":      {"en":"Export DSW [File]", "ja":"DSW\u30a8\u30af\u30b9\u30dd\u30fc\u30c8 [File]"},
+    "export_object":    {"en":"Export DSW [Object]", "ja":"DSW\u30a8\u30af\u30b9\u30dd\u30fc\u30c8 [Object]"},
+    "delete_dsw":       {"en":"Delete Selected DSW", "ja":"\u9078\u629eDSW\u3092\u524a\u9664"},
+    "bf_title":         {"en":"Fit Skeleton A to B (BETA)",
+                         "ja":"\u30b9\u30b1\u30eb\u30c8\u30f3A\u3092B\u306b\u5408\u308f\u305b (BETA)"},
+    "bf_source":        {"en":"A: Source skeleton (joint root):",
+                         "ja":"A: \u30bd\u30fc\u30b9\u30b9\u30b1\u30eb\u30c8\u30f3\uff08\u30b8\u30e7\u30a4\u30f3\u30c8\u30eb\u30fc\u30c8\uff09:"},
+    "bf_target":        {"en":"B: Target skeleton (joint root):",
+                         "ja":"B: \u30bf\u30fc\u30b2\u30c3\u30c8\u30b9\u30b1\u30eb\u30c8\u30f3\uff08\u30b8\u30e7\u30a4\u30f3\u30c8\u30eb\u30fc\u30c8\uff09:"},
+    "bf_set_selected":  {"en":"< Set Selected", "ja":"< \u9078\u629e\u3092\u30bb\u30c3\u30c8"},
+    "bf_fit":           {"en":"Fit Joints (A -> B)", "ja":"\u30b8\u30e7\u30a4\u30f3\u30c8\u3092\u5408\u308f\u305b (A \u2192 B)"},
+    "bf_reset":         {"en":"GoToBindPose", "ja":"GoToBindPose"},
+    "bf_help":{"en":"1. Set A (source joint root)\n2. Set B (target joint root)\n3. [Fit Joints] matches by name\n   Unmatched joints are skipped\n4. [Reset Joints] to restore",
+               "ja":"1. A(\u30bd\u30fc\u30b9\u306e\u30b8\u30e7\u30a4\u30f3\u30c8\u30eb\u30fc\u30c8)\u3092\u30bb\u30c3\u30c8\n2. B(\u30bf\u30fc\u30b2\u30c3\u30c8\u306e\u30b8\u30e7\u30a4\u30f3\u30c8\u30eb\u30fc\u30c8)\u3092\u30bb\u30c3\u30c8\n3. [\u30b8\u30e7\u30a4\u30f3\u30c8\u3092\u5408\u308f\u305b]\u3067\u540d\u524d\u3067\u30de\u30c3\u30c1\n   \u4e00\u81f4\u3057\u306a\u3044\u9aa8\u306f\u30b9\u30ad\u30c3\u30d7\n4. [\u30ea\u30bb\u30c3\u30c8]\u3067\u5143\u306b\u623b\u3059"},
+    "create_set":       {"en":"Create Set SkinJoint", "ja":"\u30b9\u30ad\u30f3\u30b8\u30e7\u30a4\u30f3\u30c8\u30bb\u30c3\u30c8\u4f5c\u6210"},
+    "decimal_title":    {"en":"--- Weight Decimal Check ---", "ja":"--- \u30a6\u30a7\u30a4\u30c8\u5c0f\u6570\u70b9\u30c1\u30a7\u30c3\u30af ---"},
+    "decimal_desc":     {"en":"Find weights finer than the unit below", "ja":"\u6307\u5b9a\u5358\u4f4d\u3088\u308a\u7d30\u304b\u3044\u30a6\u30a7\u30a4\u30c8\u3092\u691c\u51fa"},
+    "check_digit":      {"en":"Check", "ja":"\u30c1\u30a7\u30c3\u30af"},
+    "clean_digit":      {"en":"Clean (Round)", "ja":"\u30af\u30ea\u30fc\u30f3\uff08\u4e38\u3081\uff09"},
+    "digit_unit":       {"en":"Unit", "ja":"\u5358\u4f4d"},
+    "inf_title":        {"en":"--- Influence Count Check ---", "ja":"--- \u30a4\u30f3\u30d5\u30eb\u30a8\u30f3\u30b9\u6570\u30c1\u30a7\u30c3\u30af ---"},
+    "inf_desc":         {"en":"Find vertices influenced by more than N joints", "ja":"N\u672c\u3088\u308a\u591a\u3044\u30b8\u30e7\u30a4\u30f3\u30c8\u306e\u5f71\u97ff\u3092\u53d7\u3051\u308b\u9802\u70b9\u3092\u691c\u51fa"},
+    "inf_max":          {"en":"Max", "ja":"\u6700\u5927\u6570"},
+    "check_inf":        {"en":"Check", "ja":"\u30c1\u30a7\u30c3\u30af"},
+    "check_samepos":    {"en":"Check SamePosition Weight", "ja":"\u540c\u4f4d\u7f6e\u30a6\u30a7\u30a4\u30c8\u30c1\u30a7\u30c3\u30af"},
+    "jne_title":        {"en":"Edit JointMap", "ja":"\u30b8\u30e7\u30a4\u30f3\u30c8\u30de\u30c3\u30d7\u7de8\u96c6"},
+    "jne_joint_name":   {"en":"Joint Name", "ja":"\u30b8\u30e7\u30a4\u30f3\u30c8\u540d"},
+    "jne_set":          {"en":"Set JointName", "ja":"\u30b8\u30e7\u30a4\u30f3\u30c8\u540d\u30bb\u30c3\u30c8"},
+    "jne_search":       {"en":"Search", "ja":"\u691c\u7d22"},
+    "jne_replace":      {"en":"Replace", "ja":"\u7f6e\u63db"},
+    "jne_substitution": {"en":"Substitution", "ja":"\u7f6e\u63db\u5b9f\u884c"},
+    "jne_prefix":       {"en":"Prefix", "ja":"\u63a5\u982d\u8f9e"},
+    "jne_suffix":       {"en":"Suffix", "ja":"\u63a5\u5c3e\u8f9e"},
+    "jne_add_ps":       {"en":"Add Prefix/Suffix", "ja":"\u63a5\u982d\u8f9e/\u63a5\u5c3e\u8f9e\u8ffd\u52a0"},
+    "jne_reset":        {"en":"Reset", "ja":"\u30ea\u30bb\u30c3\u30c8"},
+    "warn_no_dsw":      {"en":"No DSW selected.", "ja":"DSW\u304c\u9078\u629e\u3055\u308c\u3066\u3044\u307e\u305b\u3093\u3002"},
+    "warn_no_name":     {"en":"Please enter an export name.", "ja":"\u30a8\u30af\u30b9\u30dd\u30fc\u30c8\u540d\u3092\u5165\u529b\u3057\u3066\u304f\u3060\u3055\u3044\u3002"},
+    "warn_no_sel":      {"en":"Nothing selected.", "ja":"\u4f55\u3082\u9078\u629e\u3055\u308c\u3066\u3044\u307e\u305b\u3093\u3002"},
+    "warn_set_both":    {"en":"Please set both Source and Target.", "ja":"\u30bd\u30fc\u30b9\u3068\u30bf\u30fc\u30b2\u30c3\u30c8\u306e\u4e21\u65b9\u3092\u30bb\u30c3\u30c8\u3057\u3066\u304f\u3060\u3055\u3044\u3002"},
+    "warn_delete_confirm":{"en":"Delete selected DSW?\n{0}", "ja":"\u9078\u629e\u3057\u305fDSW\u3092\u524a\u9664\u3057\u307e\u3059\u304b\uff1f\n{0}"},
+    "report_title":     {"en":"Operation Report", "ja":"\u51e6\u7406\u30ec\u30dd\u30fc\u30c8"},
+    "htu_title":        {"en":"How to Use", "ja":"\u4f7f\u3044\u65b9"},
+    "htu_content":{
+        "en":(
+            "=== DoraSkinWeight Tools Py v{ver} ===\n\n"
+            "--- EXPORT ---\n"
+            "1. Select skinned mesh.\n"
+            "2. [Export] tab > enter name > [File] or [Object].\n"
+            "   [File]: saves to <workspace>/dsw/\n"
+            "   [Object]: stores in scene node.\n"
+            "3. Use [Delete Selected DSW] to remove entries.\n\n"
+            "--- IMPORT ---\n"
+            "1. Select skinned mesh.\n"
+            "2. [Import] tab > select DSW > choose mode.\n"
+            "   XYZ Position (default): world-space match.\n"
+            "   Vertex Order: same topology.\n"
+            "   UV Position: UV-based match.\n"
+            "3. [Import DSW] to apply.\n\n"
+            "--- VERTEX PASTE ---\n"
+            "Paste weights ONLY to selected vertices.\n"
+            "1. Export source weights.\n"
+            "2. Select vertices on target mesh.\n"
+            "3. Select DSW, click [Vertex Paste].\n\n"
+            "--- BODY TRANSFER ---\n"
+            "1. [Body Transfer] tab.\n"
+            "2. Set Body A (source) and Body B (target).\n"
+            "3. Click [Transfer Weights (A->B)].\n\n"
+            "--- DATA CHECK ---\n"
+            "- Weight Precision: finds weights finer than threshold (default 0.01).\n"
+            "- SamePosition: finds overlapping verts with different weights.\n"
+            "- Create SkinJoint Set: makes a joint selection set.\n\n"
+            "--- TIPS ---\n"
+            "- Maya 2018-2025 compatible.\n"
+            "- DSW format compatible with original MEL version.\n"),
+        "ja":(
+            "=== DoraSkinWeight Tools Py v{ver} ===\n\n"
+            "--- \u30a8\u30af\u30b9\u30dd\u30fc\u30c8 ---\n"
+            "1. \u30b9\u30ad\u30f3\u6e08\u307f\u30e1\u30c3\u30b7\u30e5\u3092\u9078\u629e\u3002\n"
+            "2. [\u30a8\u30af\u30b9\u30dd\u30fc\u30c8]\u30bf\u30d6 > \u540d\u524d\u5165\u529b > [File]\u307e\u305f\u306f[Object]\u3002\n"
+            "   [File]: <workspace>/dsw/ \u306b\u4fdd\u5b58\u3002\n"
+            "   [Object]: \u30b7\u30fc\u30f3\u30ce\u30fc\u30c9\u306b\u4fdd\u5b58\u3002\n"
+            "3. [\u9078\u629eDSW\u3092\u524a\u9664]\u3067\u4e0d\u8981\u306a\u30c7\u30fc\u30bf\u3092\u524a\u9664\u3002\n\n"
+            "--- \u30a4\u30f3\u30dd\u30fc\u30c8 ---\n"
+            "1. \u30b9\u30ad\u30f3\u6e08\u307f\u30e1\u30c3\u30b7\u30e5\u3092\u9078\u629e\u3002\n"
+            "2. [\u30a4\u30f3\u30dd\u30fc\u30c8]\u30bf\u30d6 > DSW\u9078\u629e > \u30e2\u30fc\u30c9\u9078\u629e\u3002\n"
+            "   XYZ\u5ea7\u6a19(\u30c7\u30d5\u30a9\u30eb\u30c8): \u30ef\u30fc\u30eb\u30c9\u5ea7\u6a19\u3067\u30de\u30c3\u30c1\u3002\n"
+            "   \u9802\u70b9\u756a\u53f7\u9806: \u540c\u4e00\u30c8\u30dd\u30ed\u30b8\u30fc\u7528\u3002\n"
+            "   UV\u5ea7\u6a19: UV\u3067\u30de\u30c3\u30c1\u3002\n"
+            "3. [DSW\u30a4\u30f3\u30dd\u30fc\u30c8]\u3067\u9069\u7528\u3002\n\n"
+            "--- \u9802\u70b9\u30da\u30fc\u30b9\u30c8 ---\n"
+            "\u9078\u629e\u9802\u70b9\u306e\u307f\u306b\u30a6\u30a7\u30a4\u30c8\u3092\u30da\u30fc\u30b9\u30c8\u3002\n"
+            "1. \u30bd\u30fc\u30b9\u306e\u30a6\u30a7\u30a4\u30c8\u3092\u30a8\u30af\u30b9\u30dd\u30fc\u30c8\u3002\n"
+            "2. \u30bf\u30fc\u30b2\u30c3\u30c8\u306e\u9802\u70b9\u3092\u9078\u629e\u3002\n"
+            "3. DSW\u3092\u9078\u629e\u3057\u3001[\u9802\u70b9\u30da\u30fc\u30b9\u30c8]\u3002\n\n"
+            "--- \u4f53\u578b\u8ee2\u9001 ---\n"
+            "1. [\u4f53\u578b\u8ee2\u9001]\u30bf\u30d6\u3002\n"
+            "2. \u4f53\u578bA(\u30bd\u30fc\u30b9)\u3068\u4f53\u578bB(\u30bf\u30fc\u30b2\u30c3\u30c8)\u3092\u30bb\u30c3\u30c8\u3002\n"
+            "3. [\u30a6\u30a7\u30a4\u30c8\u8ee2\u9001(A\u2192B)]\u3002\n\n"
+            "--- \u30c7\u30fc\u30bf\u30c1\u30a7\u30c3\u30af ---\n"
+            "- \u30a6\u30a7\u30a4\u30c8\u7cbe\u5ea6: \u95be\u5024(\u30c7\u30d5\u30a9\u30eb\u30c80.01)\u3088\u308a\u7d30\u304b\u3044\u30a6\u30a7\u30a4\u30c8\u3092\u691c\u51fa\u3002\n"
+            "- \u540c\u4f4d\u7f6e\u30c1\u30a7\u30c3\u30af: \u540c\u3058\u4f4d\u7f6e\u3067\u30a6\u30a7\u30a4\u30c8\u304c\u7570\u306a\u308b\u9802\u70b9\u3092\u691c\u51fa\u3002\n"
+            "- \u30b9\u30ad\u30f3\u30b8\u30e7\u30a4\u30f3\u30c8\u30bb\u30c3\u30c8\u4f5c\u6210\u3002\n\n"
+            "--- \u30d2\u30f3\u30c8 ---\n"
+            "- Maya 2018\uff5e2025\u5bfe\u5fdc\u3002\n"
+            "- DSW\u30d5\u30a9\u30fc\u30de\u30c3\u30c8\u306f\u30aa\u30ea\u30b8\u30ca\u30ebMEL\u7248\u3068\u4e92\u63db\u3002\n"),
+    },
+}
+
+def tr(key, **kw):
+    e = _S.get(key, {})
+    t = e.get(_LANG, e.get("en", key))
+    if kw: t = t.format(**kw)
+    return t
+
+def set_language(lang):
+    global _LANG; _LANG = lang
+
+

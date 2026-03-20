@@ -1,0 +1,193 @@
+# ============================================================================
+# Data Check Functions
+# ============================================================================
+
+def create_skin_joint_set():
+    sl=cmds.filterExpand(sm=12) or []
+    if not sl: show_status("No skinned mesh selected",True); return 0
+    sh=get_shape(sl[0]); sc=get_skin_cluster(sh)
+    if not sc: show_status("No skinCluster",True); return 0
+    jl=cmds.listConnections(sc+".matrix",type="joint") or []
+    cmds.sets(jl,name="SkinJointSet_"+sl[0])
+    show_status("Created SkinJointSet for "+sl[0]); return 1
+
+def check_weight_digit(unit=0.01):
+    """Find vertices with weights finer than unit. Bulk-optimized via OpenMaya."""
+    max_places = _unit_to_places(unit)
+    sl=cmds.filterExpand(sm=12) or []
+    if not sl: show_status("No skinned mesh selected",True); return 0
+    sh=get_shape(sl[0]); sc=get_skin_cluster(sh)
+    if not sc: show_status("No skinCluster",True); return 0
+    st=time.time()
+    jl=get_joint_list_from_sc(sc)
+    vc=cmds.polyEvaluate(sh,vertex=True); sv=[]
+
+    # Bulk fetch weights
+    all_weights = _bulk_get_weights(sc, sh, vc, len(jl))
+    progress_start("Checking decimals...", vc)
+    for i in range(vc):
+        if i % 1000 == 0:
+            progress_update(min(1000, vc - i), "Check {0}/{1}".format(i, vc))
+        if all_weights:
+            wl = all_weights[i]
+        else:
+            wl = cmds.skinPercent(sc, "{0}.vtx[{1}]".format(sh,i), q=True, v=True)
+        for w in wl:
+            ws = "{0:.10f}".format(w).rstrip("0")
+            if "." in ws and len(ws.split(".")[1]) > max_places:
+                sv.append("{0}.vtx[{1}]".format(sh,i)); break
+    progress_end()
+    elapsed = time.time() - st
+    if sv:
+        cmds.select(sv, r=True)
+        show_status("Found {0} vertices finer than {1}".format(len(sv), unit))
+    else:
+        show_status("Check Pass (unit: {0})".format(unit))
+    show_check_result("Weight Decimal Check", len(sv), vc,
+                      "Unit: {0}\nTime: {1:.2f}s".format(unit, elapsed))
+    return 1
+
+
+def _unit_to_places(unit):
+    """Convert a unit value like 0.01 to number of decimal places (2)."""
+    us = "{0:.10f}".format(unit).rstrip("0")
+    mp = len(us.split(".")[1]) if "." in us else 0
+    return max(mp, 1)
+
+
+def clean_weight_digit(unit=0.01):
+    """Round all skin weights to the specified unit and remove values below it."""
+    places = _unit_to_places(unit)
+    sl=cmds.filterExpand(sm=12) or []
+    if not sl: show_status("No skinned mesh selected",True); return 0
+    sh=get_shape(sl[0]); sc=get_skin_cluster(sh)
+    if not sc: show_status("No skinCluster",True); return 0
+    joints = get_joint_list_from_sc(sc)
+    if not joints: show_status("No joints",True); return 0
+    st=time.time()
+    vc=cmds.polyEvaluate(sh,vertex=True); fixed=0
+    progress_start("Cleaning weights...",vc)
+    cmds.setAttr(sc+".normalizeWeights",0)
+    for i in range(vc):
+        progress_update(1,"Clean {0}/{1}".format(i+1,vc))
+        vt="{0}.vtx[{1}]".format(sh,i)
+        wl=cmds.skinPercent(sc,vt,q=True,v=True)
+        new_w = []
+        needs_fix = False
+        for w in wl:
+            rw = round(w, places)
+            if rw < unit: rw = 0.0
+            if abs(rw - w) > 1e-12: needs_fix = True
+            new_w.append(rw)
+        if not needs_fix: continue
+        total = sum(new_w)
+        if total > 0:
+            new_w = [w / total for w in new_w]
+            new_w = [round(w, places) for w in new_w]
+            diff = 1.0 - sum(new_w)
+            if abs(diff) > 1e-12:
+                max_i = new_w.index(max(new_w))
+                new_w[max_i] = round(new_w[max_i] + diff, places)
+        else:
+            new_w[0] = 1.0
+        tv = [(joints[j], new_w[j]) for j in range(min(len(joints), len(new_w)))]
+        cmds.skinPercent(sc, vt, r=False, transformValue=tv)
+        fixed += 1
+    cmds.setAttr(sc+".normalizeWeights",1)
+    progress_end()
+    elapsed=time.time()-st
+    show_status("Cleaned {0}/{1} vertices (unit: {2})".format(fixed, vc, unit))
+    cmds.confirmDialog(title="Weight Clean", 
+                       message="Cleaned {0} / {1} vertices.\nUnit: {2}\nTime: {3:.2f}s".format(fixed, vc, unit, elapsed),
+                       button=["OK"], icon="information")
+    return 1
+
+
+def _quantize_weight_params(params, unit=0.01):
+    """Filter and round a transformValue list. Weights below unit become 0, then re-normalize."""
+    if not params or unit <= 0: return params
+    places = _unit_to_places(unit)
+    rounded = []
+    for jname, w in params:
+        rw = round(w, places)
+        if rw < unit: rw = 0.0
+        rounded.append((jname, rw))
+    total = sum(w for _, w in rounded)
+    if total > 0:
+        rounded = [(j, round(w / total, places)) for j, w in rounded]
+        # Fix rounding drift
+        diff = 1.0 - sum(w for _, w in rounded)
+        if abs(diff) > 1e-12:
+            max_i = max(range(len(rounded)), key=lambda i: rounded[i][1])
+            j, w = rounded[max_i]
+            rounded[max_i] = (j, round(w + diff, places))
+    return rounded
+
+def check_same_position():
+    sl=cmds.filterExpand(sm=12) or []
+    if not sl: show_status("No skinned mesh selected",True); return 0
+    sh=get_shape(sl[0]); sc=get_skin_cluster(sh)
+    if not sc: show_status("No skinCluster",True); return 0
+    st=time.time()
+    cmds.select(cl=True)
+    vc=cmds.polyEvaluate(sh,vertex=True); spa=SpatialIndex(); spa.build_from_shape(sh)
+    cf=[0]*vc; pv=[]
+    progress_start("Checking positions...",vc)
+    for i in range(vc):
+        progress_update(1,"Check {0}/{1}".format(i+1,vc))
+        if cf[i]: continue
+        cf[i]=1; pi=spa.vtx_positions[i]; cands=spa.get_cand_vtx(pi)
+        vg=["{0}.vtx[{1}]".format(sh,i)]
+        wi=",".join([str(w) for w in cmds.skinPercent(sc,vg[0],q=True,v=True)])
+        hit=False
+        for ci in cands:
+            if cf[ci]: continue
+            pc=spa.vtx_positions[ci]
+            if math.sqrt((pi[0]-pc[0])**2+(pi[1]-pc[1])**2+(pi[2]-pc[2])**2)<0.001:
+                cf[ci]=1; vc2="{0}.vtx[{1}]".format(sh,ci); vg.append(vc2)
+                wc=",".join([str(w) for w in cmds.skinPercent(sc,vc2,q=True,v=True)])
+                if wi!=wc: hit=True
+        if hit: pv.extend(vg)
+    progress_end()
+    elapsed=time.time()-st
+    if pv: cmds.select(pv,r=True); show_status("Found {0} problem vertices".format(len(pv)))
+    else: show_status("Check Pass - no same-position conflicts")
+    show_check_result("Same Position Check", len(pv), vc,
+                      "Time: {0:.2f}s".format(elapsed))
+    return 1
+
+
+def check_influence_count(max_inf=4):
+    """Find vertices influenced by more than max_inf joints. Bulk-optimized via OpenMaya."""
+    sl=cmds.filterExpand(sm=12) or []
+    if not sl: show_status("No skinned mesh selected",True); return 0
+    sh=get_shape(sl[0]); sc=get_skin_cluster(sh)
+    if not sc: show_status("No skinCluster",True); return 0
+    st=time.time()
+    jl=get_joint_list_from_sc(sc)
+    vc=cmds.polyEvaluate(sh,vertex=True); sv=[]
+
+    all_weights = _bulk_get_weights(sc, sh, vc, len(jl))
+    progress_start("Checking influences...", vc)
+    for i in range(vc):
+        if i % 1000 == 0:
+            progress_update(min(1000, vc - i), "Check {0}/{1}".format(i, vc))
+        if all_weights:
+            wl = all_weights[i]
+        else:
+            wl = cmds.skinPercent(sc, "{0}.vtx[{1}]".format(sh,i), q=True, v=True)
+        inf_count = sum(1 for w in wl if abs(w) > 1e-10)
+        if inf_count > max_inf:
+            sv.append("{0}.vtx[{1}]".format(sh,i))
+    progress_end()
+    elapsed = time.time() - st
+    if sv:
+        cmds.select(sv,r=True)
+        show_status("Found {0} vertices with >{1} influences".format(len(sv),max_inf))
+    else:
+        show_status("Check Pass (max {0} influences)".format(max_inf))
+    show_check_result("Influence Count Check", len(sv), vc,
+                      "Max influences: {0}\nTime: {1:.2f}s".format(max_inf, elapsed))
+    return 1
+
+

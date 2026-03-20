@@ -1,0 +1,71 @@
+# ============================================================================
+# Vertex Paste (was Face Paste - now works on selected vertices directly)
+# ============================================================================
+
+def vertex_paste_weights(dn, im=0, acc=0.001, jm=None, min_w=0.01):
+    st=time.time()
+    vtx_sel = cmds.filterExpand(sm=31) or []
+    face_sel = cmds.filterExpand(sm=34) or []
+    if face_sel and not vtx_sel:
+        vtx_sel = cmds.ls(cmds.polyListComponentConversion(face_sel, ff=True, tv=True) or [], fl=True)
+    if not vtx_sel:
+        show_status("No vertices or faces selected.", True); return 0
+    vtx_sel = cmds.ls(vtx_sel, fl=True)
+    obj = vtx_sel[0].split(".")[0]; sh=get_shape(obj); sc=get_skin_cluster(sh)
+    if not sc: show_status("No skinCluster on selection.",True); return 0
+    tj=get_joint_list_from_sc(sc)
+    tvi=set()
+    for v in vtx_sel: tvi.add(int(v.split("[")[-1].rstrip("]")))
+    dl=read_dsw(dn)
+    if not dl: return 0
+    dj=[simple_obj_name(j) for j in dl[1].split(",")]
+    if jm: dj=[jm.get(j,j) for j in dj]
+    ei=[s for s,t in enumerate(tj) if t in dj]
+    ui=[s for s,t in enumerate(tj) if t not in dj]
+    tv=cmds.polyEvaluate(sh,vertex=True); wsf=[0]*tv
+    progress_start("Vertex Paste...",len(tvi))
+    cmds.setAttr(sc+".normalizeWeights",0); cmds.setAttr(sc+".envelope",0)
+    ds=2; cnt=0
+    if im==0:
+        for i in sorted(tvi):
+            progress_update(1,"Paste {0}/{1}".format(cnt+1,len(tvi)))
+            li=ds+i
+            if li>=len(dl): continue
+            ln=dl[li]
+            if not ln: continue
+            p=ln.split("|")
+            pm=_build_wp(tj,ei,ui,dj,p[0],min_w)
+            if not pm: continue
+            cmds.skinPercent(sc,"{0}.vtx[{1}]".format(sh,i),r=False,transformValue=pm)
+            wsf[i]=1; cnt+=1
+    elif im in (1,2):
+        spa=SpatialIndex(); spa.build_from_shape(sh)
+        rf=[1]*tv
+        for idx in tvi: rf[idx]=0
+        r=ds
+        while r<len(dl):
+            progress_update(1,"Paste {0}".format(cnt))
+            ln=dl[r]
+            if not ln: break
+            p=ln.split("|"); r+=1
+            if im==1:
+                xyz=p[1].split(","); pos=(float(xyz[0]),float(xyz[1]),float(xyz[2]))
+                mi=spa.find_nearest(pos,"Vtx",rf,acc)
+            else:
+                uv=p[2].split(","); pos=(float(uv[0]),float(uv[1]))
+                mi=spa.find_nearest(pos,"UV",rf,acc)
+            if mi==-1: continue
+            pm=_build_wp(tj,ei,ui,dj,p[0],min_w)
+            if not pm: continue
+            cmds.skinPercent(sc,"{0}.vtx[{1}]".format(sh,mi),r=False,transformValue=pm)
+            rf[mi]=1; wsf[mi]=1; cnt+=1
+    cmds.setAttr(sc+".envelope",1)
+    cmds.skinPercent(sc,sh,normalize=True)
+    cmds.setAttr(sc+".normalizeWeights",1)
+    progress_end()
+    cmds.select(vtx_sel,r=True)
+    t=time.time()-st
+    show_status("Vertex Paste: {0}/{1} vtx  {2:.2f}s".format(cnt, len(tvi), t))
+    return 1
+
+

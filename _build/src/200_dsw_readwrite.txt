@@ -1,0 +1,44 @@
+# ============================================================================
+# DSW Read/Write
+# ============================================================================
+
+def read_dsw(dsw_name):
+    parts=dsw_name.split(" ",1); mode=parts[0]; name=parts[1] if len(parts)>1 else ""
+    dl=[]
+    if mode=="[File]":
+        fp=os.path.join(get_dsw_directory(),name)
+        if not os.path.isfile(fp): show_status("Read DSW File Error: "+fp, True); return []
+        with open(fp,"r") as f: c=f.read()
+        dl=[l for l in c.replace("\r\n","\n").replace("\r","\n").split("\n") if l]
+    elif mode=="[Object]":
+        op="dsw|"+name
+        if cmds.objExists(op+".dsw_0"):
+            i=0
+            while cmds.objExists("{0}.dsw_{1}".format(op,i)):
+                dl.append(cmds.getAttr("{0}.dsw_{1}".format(op,i))); i+=1
+        else:
+            np=op+".notes"
+            if not cmds.objExists(np): show_status("Read DSW Object Error",True); return []
+            c=cmds.getAttr(np)
+            dl=[l for l in c.replace("\r\n","\n").replace("\r","\n").split("\n") if l]
+    if len(dl)<3: show_status("No DSW Data",True); return []
+    if dl[0]!=DSW_FORMAT_HEADER: show_status("Not DSW Format 3.00",True); return []
+    if not dl[1]: show_status("No DSW JointData",True); return []
+    return dl
+
+def write_dsw_file(fp, lines):
+    d=os.path.dirname(fp)
+    if not os.path.exists(d): os.makedirs(d)
+    with open(fp,"w") as f: f.write("\n".join(lines))
+
+def delete_dsw(dsw_name):
+    """Delete a DSW source (file or scene object)."""
+    parts=dsw_name.split(" ",1); mode=parts[0]; name=parts[1] if len(parts)>1 else ""
+    if mode=="[File]":
+        fp=os.path.join(get_dsw_directory(),name)
+        if os.path.isfile(fp): os.remove(fp); show_status("Deleted: "+fp)
+    elif mode=="[Object]":
+        op="dsw|"+name
+        if cmds.objExists(op): cmds.delete(op); show_status("Deleted: "+op)
+
+

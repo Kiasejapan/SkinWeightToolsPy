@@ -1,0 +1,205 @@
+# ============================================================================
+# Import
+# ============================================================================
+
+def _build_wp(tj, ei, ui, dj, ws, min_w=0.01):
+    w=ws.split(","); pm=[]
+    for idx in ei:
+        jn=tj[idx]
+        for ji,d in enumerate(dj):
+            if jn==d and ji<len(w): pm.append((jn,float(w[ji]))); break
+    for idx in ui: pm.append((tj[idx],0.0))
+    return _quantize_weight_params(pm, min_w)
+
+def _wt_copy(si, di, sc, sh, min_w=0.01):
+    j=get_joint_list_from_sc(sc)
+    wl=cmds.skinPercent(sc,"{0}.vtx[{1}]".format(sh,si),q=True,v=True)
+    tv=[(j[i],wl[i]) for i in range(min(len(j),len(wl)))]
+    tv=_quantize_weight_params(tv, min_w)
+    if tv: cmds.skinPercent(sc,"{0}.vtx[{1}]".format(sh,di),r=False,transformValue=tv)
+
+def _bind_dsw(obj, dn, jm=None):
+    sh=get_shape(obj); sc=get_skin_cluster(sh)
+    if sc: cmds.skinCluster(sh,e=True,ub=True)
+    dl=read_dsw(dn)
+    if not dl: return 0
+    jl=[simple_obj_name(j) for j in dl[1].split(",")]
+    if jm: jl=[jm.get(j,j) for j in jl]
+    cmds.select(jl+[obj],r=True); cmds.skinCluster(tsb=True,n="skinCluster_"+obj); return 1
+
+def dsw_import(dn, im=0, interp=False, imode=1, acc=0.001, bs=False, jm=None, min_w=0.01, show_report=False):
+    rpt = Report("Import") if show_report else None
+    st=time.time()
+    if not dn: return 0
+    sl=cmds.filterExpand(sm=12) or []
+    if not sl: show_status("No skinned mesh selected",True); return 0
+    sh=get_shape(sl[0])
+    if rpt: rpt.log("Target: {0}  Shape: {1}".format(sl[0], sh))
+    if rpt: rpt.log("DSW: {0}  Mode: {1}  Accuracy: {2}  MinWeight: {3}".format(
+        dn, ["VtxOrder","XYZ","UV"][im], acc, min_w))
+    if bs: _bind_dsw(sl[0],dn,jm)
+    sc=get_skin_cluster(sh)
+    if not sc: show_status("No skinCluster found",True); return 0
+    tj=get_joint_list_from_sc(sc)
+    ov=check_overlaps(tj)
+    if ov: show_status("Joint overlaps: "+ov,True); return 0
+    dl=read_dsw(dn)
+    if not dl: return 0
+    vc=cmds.polyEvaluate(sh,vertex=True)
+    dj=[simple_obj_name(j) for j in dl[1].split(",")]
+    if jm: dj=[jm.get(j,j) for j in dj]
+    ei=[s for s,t in enumerate(tj) if t in dj]
+    ui=[s for s,t in enumerate(tj) if t not in dj]
+    if rpt:
+        rpt.log("Target joints: {0}  DSW joints: {1}".format(len(tj), len(dj)))
+        rpt.log("Matched: {0}  Unknown: {1}".format(len(ei), len(ui)))
+    wsf=[0]*vc; sp=SpatialIndex(); sp.build_from_shape(sh)
+    progress_start("Importing...",vc)
+    cmds.setAttr(sc+".normalizeWeights",0); cmds.setAttr(sc+".envelope",0)
+    ds=2
+    nj = len(tj)
+
+    # Build joint index mapping: DSW joint name -> target joint index
+    tj_idx = {t: i for i, t in enumerate(tj)}
+    dj_to_tj = {}  # dsw joint index -> target joint index
+    for di, dn_j in enumerate(dj):
+        if dn_j in tj_idx:
+            dj_to_tj[di] = tj_idx[dn_j]
+
+    # Buffer: collect weights per vertex as flat array [vc * nj]
+    # Initialize with current weights (bulk read)
+    bulk_w = _bulk_get_weights(sc, sh, vc, nj)
+    if bulk_w:
+        weight_buf = []
+        for vw in bulk_w:
+            weight_buf.append(list(vw))
+    else:
+        # Fallback: zero init
+        weight_buf = [[0.0] * nj for _ in range(vc)]
+
+    def _parse_and_assign(vtx_idx, weight_str):
+        """Parse DSW weight string and write into weight_buf."""
+        w_vals = weight_str.split(",")
+        # Zero out all
+        row = [0.0] * nj
+        for di, val_s in enumerate(w_vals):
+            if di in dj_to_tj:
+                row[dj_to_tj[di]] = float(val_s)
+        # Quantize
+        total = sum(row)
+        if total > 0 and min_w > 0:
+            places = _unit_to_places(min_w)
+            for k in range(nj):
+                row[k] = round(row[k], places)
+                if row[k] < min_w: row[k] = 0.0
+            total2 = sum(row)
+            if total2 > 0:
+                row = [round(w / total2, places) for w in row]
+                diff = 1.0 - sum(row)
+                if abs(diff) > 1e-12:
+                    mi = row.index(max(row))
+                    row[mi] = round(row[mi] + diff, places)
+        weight_buf[vtx_idx] = row
+        wsf[vtx_idx] = 1
+
+    if im==0:
+        for i in range(vc):
+            if i % 500 == 0:
+                progress_update(min(500, vc - i), "Import {0}/{1}".format(i, vc))
+            li=ds+i
+            if li>=len(dl): break
+            ln=dl[li]
+            if not ln: break
+            if wsf[i]: continue
+            p=ln.split("|")
+            _parse_and_assign(i, p[0])
+            # Batch same-weight vertices
+            for j in range(i+1,vc):
+                ji=ds+j
+                if ji>=len(dl) or wsf[j]: continue
+                if dl[ji].split("|")[0]==p[0]:
+                    weight_buf[j] = list(weight_buf[i])
+                    wsf[j]=1
+    elif im in (1,2):
+        r=ds
+        while r<len(dl):
+            if (r - ds) % 500 == 0:
+                progress_update(min(500, len(dl) - r), "Import {0}/{1}".format(r-ds, len(dl)-ds))
+            ln=dl[r]
+            if not ln: break
+            p=ln.split("|"); r+=1
+            if im==1:
+                xyz=p[1].split(","); pos=(float(xyz[0]),float(xyz[1]),float(xyz[2]))
+                mi=sp.find_nearest(pos,"Vtx",wsf,acc)
+            else:
+                uv=p[2].split(","); pos=(float(uv[0]),float(uv[1]))
+                mi=sp.find_nearest(pos,"UV",wsf,acc)
+            if mi==-1: continue
+            _parse_and_assign(mi, p[0])
+
+    # Interpolation: copy nearest matched vertex weights
+    if interp:
+        for i in range(vc):
+            if wsf[i]: continue
+            if i % 200 == 0:
+                progress_update(min(200, vc - i), "Interpolate {0}/{1}".format(i, vc))
+            bi,bd=-1,float('inf')
+            for j in range(vc):
+                if i==j or wsf[j]!=1: continue
+                if imode==1:
+                    pi,pj=sp.vtx_positions[i],sp.vtx_positions[j]
+                    d=(pi[0]-pj[0])**2+(pi[1]-pj[1])**2+(pi[2]-pj[2])**2
+                else:
+                    pi,pj=sp.uv_positions[i],sp.uv_positions[j]
+                    d=(pi[0]-pj[0])**2+(pi[1]-pj[1])**2
+                if d<bd: bd=d; bi=j
+            if bi==-1: break
+            weight_buf[i] = list(weight_buf[bi])
+            wsf[i]=2
+
+    # Bulk write all weights via OpenMaya
+    progress_update(1, "Writing weights...")
+    try:
+        fn = _get_skin_fn(sc)
+        dp = _get_dag_path(sh)
+        fn_comp = om.MFnSingleIndexedComponent()
+        comp = fn_comp.create(om.MFn.kMeshVertComponent)
+        for i in range(vc):
+            fn_comp.addElement(i)
+        # Build flat MDoubleArray
+        weights = om.MDoubleArray(vc * nj, 0.0)
+        for i in range(vc):
+            for j in range(nj):
+                weights[i * nj + j] = weight_buf[i][j]
+        # Influence indices
+        inf_indices = om.MIntArray(nj, 0)
+        for i in range(nj):
+            inf_indices[i] = i
+        fn.setWeights(dp, comp, inf_indices, weights, False)
+    except Exception as e:
+        # Fallback: write per-vertex via cmds
+        print("[BulkWrite] API failed, fallback to cmds: {0}".format(e))
+        for i in range(vc):
+            if wsf[i] == 0: continue
+            tv = [(tj[j], weight_buf[i][j]) for j in range(nj) if weight_buf[i][j] > 0]
+            if tv:
+                cmds.skinPercent(sc, "{0}.vtx[{1}]".format(sh, i), r=False, transformValue=tv)
+
+    cmds.setAttr(sc+".envelope",1)
+    cmds.skinPercent(sc,sh,normalize=True)
+    cmds.setAttr(sc+".normalizeWeights",1)
+    progress_end()
+    s1,s2=wsf.count(1),wsf.count(2)
+    t=time.time()-st
+    show_status("Import: {0}({1}) vtx  {2:.2f}s".format(s1+s2, s2, t))
+    # Always show detail in report window
+    if not rpt:
+        rpt = Report("Import")
+    rpt.log("Shape: {0}".format(sh))
+    rpt.log("DSW: {0}".format(dn))
+    rpt.log("Direct match: {0}  Interpolated: {1}  Total: {2}".format(s1, s2, vc))
+    rpt.log("Time: {0:.2f}s".format(t))
+    rpt.show_window()
+    return 1
+
+

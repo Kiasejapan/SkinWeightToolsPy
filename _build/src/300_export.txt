@@ -1,0 +1,95 @@
+# ============================================================================
+# Export
+# ============================================================================
+
+def dsw_export(dsw_name):
+    st=time.time()
+    sl=cmds.filterExpand(sm=12) or []
+    mode=0
+    if not sl:
+        sl=cmds.filterExpand(sm=31) or []
+        if sl: sl=cmds.ls(sl,fl=True)
+        if not sl: show_status("No skinned mesh selected",True); return 0
+        mode=2
+    else: mode=1
+    shape=get_shape(sl[0]); sc=get_skin_cluster(shape)
+    if not sc: show_status("No skinCluster found",True); return 0
+    jl=get_joint_list_from_sc(sc)
+    ov=check_overlaps(jl)
+    if ov: show_status("JointName Overlaps: "+ov,True); return 0
+    vc=cmds.polyEvaluate(shape,vertex=True) if mode==1 else len(sl)
+    el=[DSW_FORMAT_HEADER, ",".join(jl)]
+
+    # Bulk fetch all data via OpenMaya
+    all_weights = None
+    all_pos = None
+    all_uvs = None
+    if mode == 1:
+        all_weights = _bulk_get_weights(sc, shape, vc, len(jl))
+        all_pos = _bulk_get_positions(shape, vc)
+        all_uvs = _bulk_get_uvs(shape, vc)
+
+    progress_start("Exporting...", vc)
+    nuv = 0
+    for i in range(vc):
+        if i % 500 == 0:
+            progress_update(min(500, vc - i), "Export {0}/{1}".format(i, vc))
+        wv="{0}.vtx[{1}]".format(shape,i) if mode==1 else sl[i]
+
+        # Weights
+        if all_weights and i < len(all_weights):
+            wl = all_weights[i]
+        else:
+            wl = cmds.skinPercent(sc, wv, q=True, v=True)
+        ws = ",".join([str(w) for w in wl])
+
+        # Position
+        if all_pos and i < len(all_pos):
+            wp = all_pos[i]
+        else:
+            wp = cmds.pointPosition(wv, w=True)
+        ps = "{0},{1},{2}".format(wp[0], wp[1], wp[2])
+
+        # UV
+        u, v = 0.0, 0.0
+        if all_uvs and i < len(all_uvs):
+            u, v = all_uvs[i]
+        else:
+            un = vtx_to_uv(wv)
+            if un:
+                try:
+                    uv = cmds.getAttr(un)
+                    if isinstance(uv, list) and uv:
+                        if isinstance(uv[0], tuple): u, v = uv[0][0], uv[0][1]
+                        else: u, v = uv[0], uv[1]
+                except Exception: nuv += 1
+            else: nuv += 1
+
+        el.append("{0}|{1}|{2},{3}".format(ws, ps, u, v))
+
+    pts=dsw_name.split(" ",1); em,enp=pts[0],pts[1] if len(pts)>1 else dsw_name; ep=""
+    if em=="[File]":
+        fp=os.path.join(get_dsw_directory(),ext_check(enp,".dsw")); write_dsw_file(fp,el); ep=fp
+    elif em=="[Object]":
+        on=os.path.splitext(enp)[0]; op="dsw|"+on
+        if not cmds.objExists("dsw"): cmds.group(empty=True,n="dsw")
+        if cmds.objExists(op): cmds.delete(op)
+        cmds.group(empty=True,n=on,p="dsw")
+        for i,ln in enumerate(el):
+            cmds.addAttr(op,ln="dsw_{0}".format(i),dt="string")
+            cmds.setAttr("{0}.dsw_{1}".format(op,i),ln,type="string")
+        ep=op; cmds.select(sl,r=True)
+    progress_end()
+    t=time.time()-st
+    show_status("Export: {0} vtx  {1:.2f}s".format(vc, t))
+    # Show detail in report window
+    r = Report("Export")
+    r.log("DSW: {0}".format(ep))
+    r.log("Shape: {0}".format(shape))
+    r.log("Vertices: {0}".format(vc))
+    r.log("Joints: {0}".format(len(jl)))
+    r.log("Time: {0:.2f}s".format(t))
+    r.show_window()
+    return 1
+
+

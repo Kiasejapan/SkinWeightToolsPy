@@ -1,0 +1,62 @@
+# ============================================================================
+# Spatial Index
+# ============================================================================
+
+class SpatialIndex(object):
+    def __init__(self):
+        self.vtx_positions=[]; self.uv_positions=[]
+        self._vb={}; self._ub={}
+    def clear(self):
+        self.vtx_positions=[]; self.uv_positions=[]; self._vb={}; self._ub={}
+    @staticmethod
+    def _vk(p): return (int(math.floor(p[0]*0.2)),int(math.floor(p[1]*0.2)),int(math.floor(p[2]*0.2)))
+    @staticmethod
+    def _uk(p): return (int(math.floor(p[0]*20)),int(math.floor(p[1]*20)),0)
+    def build_from_shape(self, shape):
+        self.clear()
+        vc = cmds.polyEvaluate(shape, vertex=True)
+        sel=om.MSelectionList(); sel.add(shape)
+        dp=om.MDagPath(); sel.getDagPath(0,dp)
+        fm=om.MFnMesh(dp); pts=om.MPointArray(); fm.getPoints(pts,om.MSpace.kWorld)
+        for i in range(pts.length()):
+            p=(pts[i].x,pts[i].y,pts[i].z); self.vtx_positions.append(p)
+            bk=self._vk(p); self._vb.setdefault(bk,[]).append(i)
+        for i in range(vc):
+            vn="{0}.vtx[{1}]".format(shape,i); un=vtx_to_uv(vn); u,v=0.0,0.0
+            if un:
+                try:
+                    uv=cmds.getAttr(un)
+                    if isinstance(uv,list) and uv:
+                        if isinstance(uv[0],tuple): u,v=uv[0][0],uv[0][1]
+                        else: u,v=uv[0],uv[1]
+                except Exception: pass
+            self.uv_positions.append((u,v))
+            bk=self._uk((u,v)); self._ub.setdefault(bk,[]).append(i)
+    def get_cand_vtx(self, pos, r=1):
+        c=self._vk(pos); res=[]
+        for dx in range(-r,r+1):
+            for dy in range(-r,r+1):
+                for dz in range(-r,r+1):
+                    bk=(c[0]+dx,c[1]+dy,c[2]+dz)
+                    if bk in self._vb: res.extend(self._vb[bk])
+        return res
+    def get_cand_uv(self, pos, r=1):
+        c=self._uk(pos); res=[]
+        for dx in range(-r,r+1):
+            for dy in range(-r,r+1):
+                bk=(c[0]+dx,c[1]+dy,0)
+                if bk in self._ub: res.extend(self._ub[bk])
+        return res
+    def find_nearest(self, pos, mode="Vtx", used=None, md=0.001):
+        cands = self.get_cand_vtx(pos) if mode=="Vtx" else self.get_cand_uv(pos)
+        ps = self.vtx_positions if mode=="Vtx" else self.uv_positions
+        bi,bd=-1,md
+        for idx in cands:
+            if used and used[idx]: continue
+            p=ps[idx]
+            if mode=="Vtx": d=math.sqrt((pos[0]-p[0])**2+(pos[1]-p[1])**2+(pos[2]-p[2])**2)
+            else: d=math.sqrt((pos[0]-p[0])**2+(pos[1]-p[1])**2)
+            if d<=bd: bd=d; bi=idx
+        return bi
+
+
