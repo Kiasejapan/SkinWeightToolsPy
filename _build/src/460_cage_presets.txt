@@ -1,0 +1,174 @@
+# --- [460] cage_presets ---
+# ============================================================================
+# Cage Weight Presets
+# ============================================================================
+# Weight mode definitions, per-bone weight computation, and preset dictionaries.
+# Depends on: 000 (math, cmds)
+
+# Weight modes: defines how weight transitions between adjacent bones
+CAGE_MODES = {
+    "soft":   {"label_en": "Soft sway",    "label_ja": "\u67d4\u3089\u304b\u63fa\u308c"},
+    "hard":   {"label_en": "Hard sway",    "label_ja": "\u786c\u3044\u63fa\u308c"},
+    "human":  {"label_en": "Human joint",  "label_ja": "\u4eba\u4f53\u95a2\u7bc0"},
+    "figure": {"label_en": "Figure joint", "label_ja": "\u30d5\u30a3\u30ae\u30e5\u30a2\u95a2\u7bc0"},
+    "locked": {"label_en": "Locked",       "label_ja": "\u30ed\u30c3\u30af"},
+}
+
+CAGE_MODE_ORDER = ["soft", "hard", "human", "figure", "locked"]
+
+# Presets: maps preset name to a list of mode strings.
+# The list length should match (num_bones - 1), one mode per bone segment.
+# If the bone count differs, the preset is repeated or truncated.
+CAGE_PRESETS = {
+    "hair_free":    {"label_en": "Hair (free)",        "label_ja": "\u9aea\uff08\u81ea\u7531\uff09",
+                     "modes": ["soft", "soft", "soft", "soft"]},
+    "hair_tied":    {"label_en": "Hair (tied)",        "label_ja": "\u9aea\uff08\u7d50\u3073\uff09",
+                     "modes": ["soft", "locked", "locked", "soft"]},
+    "cloth":        {"label_en": "Cloth",              "label_ja": "\u5e03",
+                     "modes": ["soft", "soft", "soft", "soft"]},
+    "leather":      {"label_en": "Leather",            "label_ja": "\u9769",
+                     "modes": ["hard", "hard", "hard", "hard"]},
+    "arm_human":    {"label_en": "Arm (human)",        "label_ja": "\u8155\uff08\u4eba\u4f53\uff09",
+                     "modes": ["human", "human", "human", "human"]},
+    "arm_robot":    {"label_en": "Robot arm",          "label_ja": "\u30ed\u30dc\u30c3\u30c8\u8155",
+                     "modes": ["figure", "figure", "figure", "figure"]},
+    "ponytail_rib": {"label_en": "Ponytail+ribbon",   "label_ja": "\u30dd\u30cb\u30c6+\u30ea\u30dc\u30f3",
+                     "modes": ["locked", "soft", "hard", "soft"]},
+}
+
+CAGE_PRESET_ORDER = [
+    "hair_free", "hair_tied", "cloth", "leather",
+    "arm_human", "arm_robot", "ponytail_rib",
+]
+
+
+def cage_mode_label(mode_id):
+    """Return localised label for a cage mode."""
+    m = CAGE_MODES.get(mode_id)
+    if not m:
+        return mode_id
+    key = "label_ja" if _LANG == "ja" else "label_en"
+    return m.get(key, mode_id)
+
+
+def cage_preset_label(preset_id):
+    """Return localised label for a cage preset."""
+    p = CAGE_PRESETS.get(preset_id)
+    if not p:
+        return preset_id
+    key = "label_ja" if _LANG == "ja" else "label_en"
+    return p.get(key, preset_id)
+
+
+def adapt_preset_modes(preset_id, num_segments):
+    """Adapt a preset's mode list to the actual number of bone segments.
+    num_segments = num_bones - 1.
+    If preset has fewer entries, repeat the last mode.
+    If preset has more entries, truncate.
+    Returns a list of mode strings with length == num_segments.
+    """
+    p = CAGE_PRESETS.get(preset_id)
+    if not p:
+        return ["soft"] * num_segments
+    modes = list(p["modes"])
+    if len(modes) == 0:
+        return ["soft"] * num_segments
+    while len(modes) < num_segments:
+        modes.append(modes[-1])
+    return modes[:num_segments]
+
+
+def _smoothstep(t):
+    """Hermite smoothstep: 3t^2 - 2t^3"""
+    return t * t * (3.0 - 2.0 * t)
+
+
+def compute_segment_weight(mode, frac):
+    """Compute weight blend for a single bone segment.
+
+    Args:
+        mode: one of the CAGE_MODES keys
+        frac: normalised position within the segment (0.0 = parent bone, 1.0 = child bone)
+
+    Returns:
+        (parent_weight, child_weight) tuple that sums to 1.0
+    """
+    frac = max(0.0, min(1.0, frac))
+
+    if mode == "locked":
+        # Hard cut at midpoint, no blending
+        if frac < 0.5:
+            return (1.0, 0.0)
+        return (0.0, 1.0)
+
+    if mode == "soft":
+        # Wide gaussian-like blend: smoothstep + linear mix for extra overlap feel
+        s = _smoothstep(frac)
+        blend = 0.3
+        w = s * (1.0 - blend) + frac * blend
+        return (1.0 - w, w)
+
+    if mode == "hard":
+        # Standard smoothstep, tighter than soft
+        s = _smoothstep(frac)
+        return (1.0 - s, s)
+
+    if mode == "human":
+        # Smooth joint: standard smoothstep
+        s = _smoothstep(frac)
+        return (1.0 - s, s)
+
+    if mode == "figure":
+        # Rigid segments with narrow joint zone
+        zone = 0.12
+        if frac < 0.5 - zone:
+            return (1.0, 0.0)
+        if frac > 0.5 + zone:
+            return (0.0, 1.0)
+        jt = (frac - (0.5 - zone)) / (2.0 * zone)
+        s = _smoothstep(jt)
+        return (1.0 - s, s)
+
+    # Fallback: linear
+    return (1.0 - frac, frac)
+
+
+def compute_cage_weights(num_bones, num_verts, modes):
+    """Compute full weight matrix for a cage mesh.
+
+    Args:
+        num_bones: number of bones in the chain
+        num_verts: number of vertices along the cage length
+        modes: list of mode strings, length == num_bones - 1
+
+    Returns:
+        List of lists: weights[vtx_index] = [w_bone0, w_bone1, ..., w_boneN]
+        Each inner list sums to 1.0.
+    """
+    num_segments = num_bones - 1
+    if num_segments <= 0:
+        return [[1.0]] * num_verts
+
+    # Ensure modes list matches segment count
+    while len(modes) < num_segments:
+        modes.append("soft")
+    modes = modes[:num_segments]
+
+    weights = []
+    for v in range(num_verts):
+        t = float(v) / max(num_verts - 1, 1)  # 0.0 to 1.0 along cage
+        seg_f = t * num_segments               # which segment (float)
+        seg_i = int(seg_f)                      # segment index
+        if seg_i >= num_segments:
+            seg_i = num_segments - 1
+        frac = seg_f - seg_i                    # position within segment
+
+        bw = [0.0] * num_bones
+        pw, cw = compute_segment_weight(modes[seg_i], frac)
+        bw[seg_i] = pw
+        bw[seg_i + 1] = cw
+        weights.append(bw)
+
+    return weights
+
+

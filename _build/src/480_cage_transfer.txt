@@ -1,0 +1,135 @@
+# --- [480] cage_transfer ---
+# ============================================================================
+# Cage Weight Transfer
+# ============================================================================
+# Transfer weights from cage mesh to the target mesh, with cleanup.
+# Depends on: 000 (cmds), 100 (get_shape, get_skin_cluster)
+
+def transfer_cage_weights(cage_transform, target_mesh, delete_cage=True):
+    """Transfer skin weights from cage mesh to target mesh.
+
+    Uses Maya's copySkinWeights for robust spatial matching.
+
+    Args:
+        cage_transform: cage mesh with applied weights
+        target_mesh: destination mesh transform
+        delete_cage: if True, delete cage and its skinCluster after transfer
+
+    Returns:
+        True on success, False on failure.
+    """
+    # Validate cage
+    cage_shape = get_shape(cage_transform)
+    cage_sc = get_skin_cluster(cage_shape) if cage_shape else ""
+    if not cage_sc:
+        cmds.warning("Cage mesh has no skinCluster: {0}".format(cage_transform))
+        return False
+
+    # Get joints from cage
+    cage_joints = cmds.listConnections(cage_sc + ".matrix", type="joint") or []
+    if not cage_joints:
+        cmds.warning("No joints found on cage skinCluster.")
+        return False
+
+    # Validate target
+    target_shape = get_shape(target_mesh)
+    if not target_shape:
+        cmds.warning("Cannot find shape for target: {0}".format(target_mesh))
+        return False
+
+    # Ensure target has a skinCluster; if not, bind it
+    target_sc = get_skin_cluster(target_shape)
+    if not target_sc:
+        try:
+            cmds.select(cage_joints + [target_mesh], r=True)
+            result = cmds.skinCluster(
+                cage_joints, target_mesh,
+                toSelectedBones=True,
+                bindMethod=0,
+                normalizeWeights=1,
+                weightDistribution=0,
+                maximumInfluences=4,
+                obeyMaxInfluences=True,
+                removeUnusedInfluence=False,
+            )
+            target_sc = result[0] if isinstance(result, list) else result
+        except Exception as e:
+            cmds.warning("Failed to bind target mesh: {0}".format(e))
+            return False
+
+    # Copy skin weights: cage -> target
+    try:
+        cmds.copySkinWeights(
+            sourceSkin=cage_sc,
+            destinationSkin=target_sc,
+            noMirror=True,
+            surfaceAssociation="closestPoint",
+            influenceAssociation=["name", "closestJoint", "oneToOne"],
+            normalize=True,
+        )
+    except Exception as e:
+        cmds.warning("copySkinWeights failed: {0}".format(e))
+        return False
+
+    # Cleanup
+    if delete_cage:
+        try:
+            cmds.delete(cage_transform)
+        except Exception:
+            pass
+
+    return True
+
+
+def cage_weight_full(mesh, root_joint, preset_id=None, modes=None,
+                     subdivisions=8, offset=0.05, delete_cage=True):
+    """Full pipeline: generate cage -> apply weights -> transfer -> cleanup.
+
+    Args:
+        mesh: target mesh transform
+        root_joint: root of bone chain
+        preset_id: preset name (e.g. "hair_free"). Ignored if modes is given.
+        modes: explicit list of mode strings per segment. Overrides preset_id.
+        subdivisions: cage ring count
+        offset: cage expansion factor
+        delete_cage: delete cage after transfer
+
+    Returns:
+        True on success, False on failure.
+    """
+    # Generate cage
+    cage_transform, joints = generate_cage_mesh(mesh, root_joint,
+                                                 subdivisions=subdivisions,
+                                                 offset=offset)
+    if not cage_transform:
+        return False
+
+    num_segments = len(joints) - 1
+
+    # Determine modes
+    if modes is None:
+        if preset_id is None:
+            preset_id = "hair_free"
+        modes = adapt_preset_modes(preset_id, num_segments)
+    else:
+        # Adapt length
+        while len(modes) < num_segments:
+            modes.append("soft")
+        modes = modes[:num_segments]
+
+    # Apply preset weights to cage
+    sc = apply_cage_weights(cage_transform, joints, modes)
+    if not sc:
+        cmds.warning("Failed to apply weights to cage.")
+        try:
+            cmds.delete(cage_transform)
+        except Exception:
+            pass
+        return False
+
+    # Transfer to target
+    success = transfer_cage_weights(cage_transform, mesh,
+                                     delete_cage=delete_cage)
+    return success
+
+

@@ -23,6 +23,10 @@
 | 310 | `310_import.txt` | 205 | `dsw_import()`, `_build_wp`, `_wt_copy`, `_bind_dsw` | 100, 110, 200, 210 |
 | 320 | `320_vertex_paste.txt` | 71 | `vertex_paste_weights()` | 100, 110, 200, 210, 310 |
 | 400 | `400_body_fit.txt` | 214 | `body_fit_joints()`, `body_fit_reset()` | 100 |
+| 450 | `450_cage_gen.txt` | 160 | `generate_cage_mesh()`, ケージ自動生成 | 000, 100, 210 |
+| 460 | `460_cage_presets.txt` | 140 | モード定義, プリセット辞書, `compute_cage_weights()` | 000, 010 |
+| 470 | `470_cage_weights.txt` | 100 | `apply_cage_weights()`, OpenMayaウェイト設定 | 100, 210, 450, 460 |
+| 480 | `480_cage_transfer.txt` | 80 | `cage_weight_full()`, `transfer_cage_weights()` | 100, 450, 460, 470 |
 | 500 | `500_data_check.txt` | 193 | `check_weight_digit`, `check_influence_count` 等 | 100, 210 |
 | 510 | `510_dsw_list.txt` | 14 | `get_dsw_list()` | 200 |
 | 600 | `600_gui.txt` | 348 | `DoraSkinWeightUI` クラス (全UI) | 全セクション |
@@ -36,7 +40,7 @@
 | 100-190 | ユーティリティ (汎用関数, 空間インデックス) |
 | 200-290 | データ層 (DSWファイル操作, OpenMaya) |
 | 300-390 | 主要機能 (Export, Import, Vertex Paste) |
-| 400-490 | 拡張機能 (Body Fit) |
+| 400-490 | 拡張機能 (Body Fit, Cage Weight) |
 | 500-590 | 検証・チェック機能 |
 | 600-690 | GUI |
 | 900 | エントリーポイント |

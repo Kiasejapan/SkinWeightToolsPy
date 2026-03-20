@@ -1,0 +1,235 @@
+# --- [450] cage_gen ---
+# ============================================================================
+# Cage Mesh Generation
+# ============================================================================
+# Auto-generate a cage mesh around a target mesh, aligned to a bone chain.
+# Depends on: 000 (cmds, om), 100 (get_shape, get_skin_cluster)
+
+def _get_bone_chain_ordered(root_joint):
+    """Walk from root_joint downward, returning an ordered list of joints.
+    Follows the longest child chain at each branch.
+    """
+    chain = [root_joint]
+    current = root_joint
+    while True:
+        children = cmds.listRelatives(current, children=True, type="joint", fullPath=True) or []
+        if not children:
+            break
+        # Pick the child with the longest descendant chain
+        best = children[0]
+        best_depth = 0
+        for c in children:
+            desc = cmds.listRelatives(c, allDescendents=True, type="joint") or []
+            if len(desc) >= best_depth:
+                best_depth = len(desc)
+                best = c
+        chain.append(best)
+        current = best
+    return chain
+
+
+def _get_bone_positions_world(joints):
+    """Get world-space positions of joints as list of (x,y,z) tuples."""
+    positions = []
+    for j in joints:
+        pos = cmds.xform(j, q=True, ws=True, t=True)
+        positions.append((pos[0], pos[1], pos[2]))
+    return positions
+
+
+def _compute_cage_bbox(mesh, joints, offset=0.05):
+    """Compute bounding radius per bone segment by sampling mesh vertices.
+    Returns a list of radii, one per joint position.
+    """
+    shape = get_shape(mesh)
+    if not shape:
+        return [1.0] * len(joints)
+
+    vc = cmds.polyEvaluate(shape, vertex=True)
+    bone_pos = _get_bone_positions_world(joints)
+    num_bones = len(bone_pos)
+
+    # Get all vertex positions
+    positions = _bulk_get_positions(shape, vc)
+    if not positions:
+        # Fallback: use cmds
+        positions = []
+        for i in range(vc):
+            p = cmds.pointPosition("{0}.vtx[{1}]".format(shape, i), w=True)
+            positions.append((p[0], p[1], p[2]))
+
+    # Compute bone axis (direction from first to last bone)
+    axis = [bone_pos[-1][k] - bone_pos[0][k] for k in range(3)]
+    axis_len = math.sqrt(sum(a * a for a in axis))
+    if axis_len < 0.0001:
+        return [1.0] * num_bones
+    axis = [a / axis_len for a in axis]
+
+    # For each joint, find max perpendicular distance of nearby vertices
+    radii = [0.0] * num_bones
+
+    for vx, vy, vz in positions:
+        # Project vertex onto bone axis to find nearest joint
+        dx = vx - bone_pos[0][0]
+        dy = vy - bone_pos[0][1]
+        dz = vz - bone_pos[0][2]
+        proj = dx * axis[0] + dy * axis[1] + dz * axis[2]
+
+        # Find which bone segment this vertex belongs to
+        best_bone = 0
+        best_dist = float("inf")
+        for b in range(num_bones):
+            bx, by, bz = bone_pos[b]
+            d = math.sqrt((vx - bx) ** 2 + (vy - by) ** 2 + (vz - bz) ** 2)
+            if d < best_dist:
+                best_dist = d
+                best_bone = b
+
+        # Perpendicular distance from vertex to bone axis
+        bx, by, bz = bone_pos[best_bone]
+        dx2 = vx - bx
+        dy2 = vy - by
+        dz2 = vz - bz
+        dot = dx2 * axis[0] + dy2 * axis[1] + dz2 * axis[2]
+        perp_sq = dx2 * dx2 + dy2 * dy2 + dz2 * dz2 - dot * dot
+        perp = math.sqrt(max(0.0, perp_sq))
+
+        if perp > radii[best_bone]:
+            radii[best_bone] = perp
+
+    # Apply offset and ensure minimum radius
+    min_radius = 0.01
+    for i in range(num_bones):
+        radii[i] = max(radii[i] * (1.0 + offset), min_radius)
+
+    return radii
+
+
+def generate_cage_mesh(mesh, root_joint, subdivisions=8, offset=0.05):
+    """Generate a cage mesh around the target mesh, aligned to the bone chain.
+
+    Args:
+        mesh: target mesh transform node
+        root_joint: root joint of the bone chain
+        subdivisions: number of rings along the cage length
+        offset: expansion factor beyond mesh bounding radius
+
+    Returns:
+        (cage_transform, cage_joints) where cage_transform is the new mesh name
+        and cage_joints is the ordered joint chain, or (None, None) on failure.
+    """
+    # Get ordered bone chain
+    joints = _get_bone_chain_ordered(root_joint)
+    if len(joints) < 2:
+        cmds.warning("Need at least 2 joints in the chain.")
+        return (None, None)
+
+    bone_pos = _get_bone_positions_world(joints)
+    num_bones = len(joints)
+
+    # Compute per-bone radii from mesh bounding box
+    radii = _compute_cage_bbox(mesh, joints, offset)
+
+    # Number of rings = subdivisions + 1 (top and bottom caps)
+    num_rings = max(subdivisions, 2)
+    sides = 8  # circumference segments
+
+    # Build cage vertices
+    cage_verts = []
+    for ring in range(num_rings + 1):
+        t = float(ring) / num_rings  # 0.0 to 1.0
+
+        # Interpolate position along bone chain
+        seg_f = t * (num_bones - 1)
+        seg_i = int(seg_f)
+        if seg_i >= num_bones - 1:
+            seg_i = num_bones - 2
+        frac = seg_f - seg_i
+
+        cx = bone_pos[seg_i][0] + (bone_pos[seg_i + 1][0] - bone_pos[seg_i][0]) * frac
+        cy = bone_pos[seg_i][1] + (bone_pos[seg_i + 1][1] - bone_pos[seg_i][1]) * frac
+        cz = bone_pos[seg_i][2] + (bone_pos[seg_i + 1][2] - bone_pos[seg_i][2]) * frac
+
+        # Interpolate radius
+        r = radii[seg_i] + (radii[min(seg_i + 1, num_bones - 1)] - radii[seg_i]) * frac
+
+        # Compute local frame (tangent along bone chain)
+        if seg_i < num_bones - 1:
+            tx = bone_pos[seg_i + 1][0] - bone_pos[seg_i][0]
+            ty = bone_pos[seg_i + 1][1] - bone_pos[seg_i][1]
+            tz = bone_pos[seg_i + 1][2] - bone_pos[seg_i][2]
+        else:
+            tx = bone_pos[seg_i][0] - bone_pos[seg_i - 1][0]
+            ty = bone_pos[seg_i][1] - bone_pos[seg_i - 1][1]
+            tz = bone_pos[seg_i][2] - bone_pos[seg_i - 1][2]
+
+        tlen = math.sqrt(tx * tx + ty * ty + tz * tz)
+        if tlen < 0.0001:
+            tx, ty, tz = 0.0, 1.0, 0.0
+        else:
+            tx /= tlen; ty /= tlen; tz /= tlen
+
+        # Build perpendicular axes
+        up = (0.0, 0.0, 1.0) if abs(ty) < 0.99 else (1.0, 0.0, 0.0)
+        # right = tangent x up
+        rx = ty * up[2] - tz * up[1]
+        ry = tz * up[0] - tx * up[2]
+        rz = tx * up[1] - ty * up[0]
+        rlen = math.sqrt(rx * rx + ry * ry + rz * rz)
+        if rlen > 0.0001:
+            rx /= rlen; ry /= rlen; rz /= rlen
+        # front = right x tangent
+        fx = ry * tz - rz * ty
+        fy = rz * tx - rx * tz
+        fz = rx * ty - ry * tx
+
+        for s in range(sides):
+            angle = 2.0 * math.pi * s / sides
+            ca = math.cos(angle)
+            sa = math.sin(angle)
+            vx = cx + r * (ca * rx + sa * fx)
+            vy = cy + r * (ca * ry + sa * fy)
+            vz = cz + r * (ca * rz + sa * fz)
+            cage_verts.append((vx, vy, vz))
+
+    # Build faces (quad strips between rings)
+    cage_faces = []
+    for ring in range(num_rings):
+        for s in range(sides):
+            s_next = (s + 1) % sides
+            v0 = ring * sides + s
+            v1 = ring * sides + s_next
+            v2 = (ring + 1) * sides + s_next
+            v3 = (ring + 1) * sides + s
+            cage_faces.append((v0, v1, v2, v3))
+
+    # Create the mesh in Maya
+    num_verts = len(cage_verts)
+    num_faces = len(cage_faces)
+    vert_array = om.MFloatPointArray()
+    for vx, vy, vz in cage_verts:
+        vert_array.append(om.MFloatPoint(vx, vy, vz))
+
+    poly_counts = om.MIntArray()
+    poly_connects = om.MIntArray()
+    for face in cage_faces:
+        poly_counts.append(4)
+        for vi in face:
+            poly_connects.append(vi)
+
+    fn_mesh = om.MFnMesh()
+    new_obj = fn_mesh.create(num_verts, num_faces, vert_array,
+                              poly_counts, poly_connects)
+
+    # Get the transform name
+    dag = om.MDagPath()
+    om.MDagPath.getAPathTo(new_obj, dag)
+    cage_transform = dag.partialPathName()
+
+    # Rename
+    cage_name = simple_obj_name(mesh) + "_cage"
+    cage_transform = cmds.rename(cage_transform, cage_name)
+
+    return (cage_transform, joints)
+
+

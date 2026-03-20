@@ -1,0 +1,124 @@
+# --- [470] cage_weights ---
+# ============================================================================
+# Cage Weight Application
+# ============================================================================
+# Bind cage mesh to bones and apply algorithmic weights based on mode presets.
+# Depends on: 000 (cmds, om, oma), 100 (get_shape, get_skin_cluster),
+#             210 (OpenMaya helpers), 450 (cage_gen), 460 (cage_presets)
+
+def _bind_cage(cage_transform, joints):
+    """Bind skin the cage mesh to the joint chain.
+    Returns the skinCluster name or None on failure.
+    """
+    try:
+        # Select joints + cage
+        sel_list = list(joints) + [cage_transform]
+        cmds.select(sel_list, r=True)
+        sc = cmds.skinCluster(
+            joints, cage_transform,
+            toSelectedBones=True,
+            bindMethod=0,           # closest distance
+            normalizeWeights=1,     # interactive
+            weightDistribution=0,   # distance
+            maximumInfluences=2,
+            obeyMaxInfluences=True,
+            removeUnusedInfluence=False,
+            name=cage_transform + "_SC",
+        )
+        if sc:
+            return sc[0] if isinstance(sc, list) else sc
+    except Exception as e:
+        cmds.warning("Cage bind failed: {0}".format(e))
+    return None
+
+
+def _set_weights_api(sc_name, shape_name, joints, weights_matrix):
+    """Set skin weights on cage mesh using OpenMaya API for speed.
+
+    Args:
+        sc_name: skinCluster node name
+        shape_name: mesh shape node name
+        joints: ordered list of joint names
+        weights_matrix: list of lists, weights_matrix[vtx] = [w0, w1, ...]
+    """
+    fn = _get_skin_fn(sc_name)
+    dp = _get_dag_path(shape_name)
+
+    num_verts = len(weights_matrix)
+    num_inf = len(joints)
+
+    # Get influence indices
+    inf_indices = om.MIntArray()
+    for i in range(num_inf):
+        inf_indices.append(i)
+
+    # Build vertex component
+    fn_comp = om.MFnSingleIndexedComponent()
+    comp = fn_comp.create(om.MFn.kMeshVertComponent)
+    for i in range(num_verts):
+        fn_comp.addElement(i)
+
+    # Build flat weight array
+    weight_array = om.MDoubleArray()
+    for vtx_weights in weights_matrix:
+        for w in vtx_weights:
+            weight_array.append(w)
+
+    # Set weights
+    fn.setWeights(dp, comp, inf_indices, weight_array, False)
+
+
+def _set_weights_cmds(sc_name, cage_transform, joints, weights_matrix):
+    """Fallback: set weights using cmds.skinPercent (slower)."""
+    for vi, vtx_weights in enumerate(weights_matrix):
+        tv = []
+        for ji, w in enumerate(vtx_weights):
+            if w > 0.0001:
+                jname = simple_obj_name(joints[ji])
+                tv.append((jname, w))
+        if tv:
+            vtx = "{0}.vtx[{1}]".format(cage_transform, vi)
+            cmds.skinPercent(sc_name, vtx, transformValue=tv, normalize=True)
+
+
+def apply_cage_weights(cage_transform, joints, modes):
+    """Bind the cage mesh and apply preset weights.
+
+    Args:
+        cage_transform: cage mesh transform name
+        joints: ordered list of joint names
+        modes: list of mode strings, length == len(joints) - 1
+
+    Returns:
+        skinCluster name or None on failure.
+    """
+    num_bones = len(joints)
+    if num_bones < 2:
+        cmds.warning("Need at least 2 joints.")
+        return None
+
+    shape = get_shape(cage_transform)
+    if not shape:
+        cmds.warning("Cannot find shape for cage: {0}".format(cage_transform))
+        return None
+
+    vc = cmds.polyEvaluate(shape, vertex=True)
+
+    # Bind skin
+    sc = _bind_cage(cage_transform, joints)
+    if not sc:
+        return None
+
+    # Compute weights
+    weights_matrix = compute_cage_weights(num_bones, vc, modes)
+
+    # Apply weights via API (fast)
+    try:
+        _set_weights_api(sc, shape, joints, weights_matrix)
+    except Exception as e:
+        print("[CageWeights] API setWeights failed, falling back to cmds: {0}".format(e))
+        _set_weights_cmds(sc, cage_transform, joints, weights_matrix)
+
+    return sc
+
+
