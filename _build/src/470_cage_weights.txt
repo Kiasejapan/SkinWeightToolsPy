@@ -1,8 +1,8 @@
 # --- [470] cage_weights ---
 # ============================================================================
-# Cage Weight Application
+# Cage Weight Application (v3)
 # ============================================================================
-# Bind cage mesh to bones and apply algorithmic weights based on mode presets.
+# Bind cage mesh to bones and apply algorithmic weights based on mode settings.
 # Depends on: 000 (cmds, om, oma), 100 (get_shape, get_skin_cluster),
 #             210 (OpenMaya helpers), 450 (cage_gen), 460 (cage_presets)
 
@@ -11,15 +11,14 @@ def _bind_cage(cage_transform, joints):
     Returns the skinCluster name or None on failure.
     """
     try:
-        # Select joints + cage
         sel_list = list(joints) + [cage_transform]
         cmds.select(sel_list, r=True)
         sc = cmds.skinCluster(
             joints, cage_transform,
             toSelectedBones=True,
-            bindMethod=0,           # closest distance
-            normalizeWeights=1,     # interactive
-            weightDistribution=0,   # distance
+            bindMethod=0,
+            normalizeWeights=1,
+            weightDistribution=0,
             maximumInfluences=2,
             obeyMaxInfluences=True,
             removeUnusedInfluence=False,
@@ -33,38 +32,27 @@ def _bind_cage(cage_transform, joints):
 
 
 def _set_weights_api(sc_name, shape_name, joints, weights_matrix):
-    """Set skin weights on cage mesh using OpenMaya API for speed.
-
-    Args:
-        sc_name: skinCluster node name
-        shape_name: mesh shape node name
-        joints: ordered list of joint names
-        weights_matrix: list of lists, weights_matrix[vtx] = [w0, w1, ...]
-    """
+    """Set skin weights on cage mesh using OpenMaya API for speed."""
     fn = _get_skin_fn(sc_name)
     dp = _get_dag_path(shape_name)
 
     num_verts = len(weights_matrix)
     num_inf = len(joints)
 
-    # Get influence indices
     inf_indices = om.MIntArray()
     for i in range(num_inf):
         inf_indices.append(i)
 
-    # Build vertex component
     fn_comp = om.MFnSingleIndexedComponent()
     comp = fn_comp.create(om.MFn.kMeshVertComponent)
     for i in range(num_verts):
         fn_comp.addElement(i)
 
-    # Build flat weight array
     weight_array = om.MDoubleArray()
     for vtx_weights in weights_matrix:
         for w in vtx_weights:
             weight_array.append(w)
 
-    # Set weights
     fn.setWeights(dp, comp, inf_indices, weight_array, False)
 
 
@@ -86,7 +74,7 @@ def apply_cage_weights(cage_transform, joints, modes):
 
     Args:
         cage_transform: cage mesh transform name
-        joints: ordered list of joint names
+        joints: ordered list of joint names (one branch)
         modes: list of mode strings, length == len(joints) - 1
 
     Returns:
@@ -104,15 +92,12 @@ def apply_cage_weights(cage_transform, joints, modes):
 
     vc = cmds.polyEvaluate(shape, vertex=True)
 
-    # Bind skin
     sc = _bind_cage(cage_transform, joints)
     if not sc:
         return None
 
-    # Compute weights
     weights_matrix = compute_cage_weights(num_bones, vc, modes)
 
-    # Apply weights via API (fast)
     try:
         _set_weights_api(sc, shape, joints, weights_matrix)
     except Exception as e:
@@ -122,3 +107,16 @@ def apply_cage_weights(cage_transform, joints, modes):
     return sc
 
 
+def apply_cage_weights_tree(cage_transform, branch_joints, per_bone_modes):
+    """Bind and weight a cage mesh using per-bone mode dict.
+
+    Args:
+        cage_transform: cage mesh transform name
+        branch_joints: ordered joint list for this branch
+        per_bone_modes: dict {joint_path: mode_id}
+
+    Returns:
+        skinCluster name or None on failure.
+    """
+    seg_modes = modes_for_branch(branch_joints, per_bone_modes)
+    return apply_cage_weights(cage_transform, branch_joints, seg_modes)

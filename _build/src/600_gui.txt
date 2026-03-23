@@ -1,21 +1,28 @@
 # ============================================================================
-# GUI
+# GUI  # v5 2026-03-20
 # ============================================================================
 
 class DoraSkinWeightUI(object):
     WIN = "DSWPy_Win"
     JNE_WIN = "DSWPy_JNE"
     HTU_WIN = "DSWPy_HTU"
+    CW_BONE_WIN = "DSWPy_CWBone"
 
     def __init__(self):
-        self.import_mode = 1  # default: XYZ
+        self.import_mode = 1
         self._jno=[]; self._jnn=[]
         self._cw_bone_menus=[]
         self._cw_joint_chain=[]
+        self._cw_bone_tree = None
+        self._cw_branches = []
+        self._cw_branch_checks = []
+        self._cw_per_bone_menus_map = {}
+        # v5: tracked cage list [(cage_transform_name, branch_joints), ...]
+        self._cw_generated_cages = []
 
     def show(self):
         if cmds.window(self.WIN,exists=True): cmds.deleteUI(self.WIN)
-        cmds.window(self.WIN, title=tr("win_title").format(VERSION), wh=(360,560), s=True)
+        cmds.window(self.WIN, title=tr("win_title").format(VERSION), wh=(420,560), s=True)
         root=cmds.columnLayout(adj=True)
 
         # === Header ===
@@ -126,149 +133,80 @@ class DoraSkinWeightUI(object):
                 (bth,"top",12,btn_rst)])
         cmds.setParent("..")
 
-        # ---- Cage Weight (BETA) ----
+        # ---- Cage Weight — main tab ----
         cwfl=cmds.formLayout()
-        cw_title=cmds.text(label=tr("tab_cage"),al="center",h=24,fn="boldLabelFont")
+        _cw_title_text = "{0} (BETA)".format(tr("tab_cage"))
+        cw_title=cmds.text(label=_cw_title_text,al="center",h=24,fn="boldLabelFont")
 
-        # Target Mesh
         cw_ml=cmds.text(label=tr("cg_target_mesh"),al="left",h=20)
         self.cw_mf=cmds.textField(h=24)
         cw_mb=cmds.button(label=tr("cg_set_sel"),h=24,w=110,c=lambda*a:self._cw_set("mesh"))
 
-        # Root Joint
         cw_jl=cmds.text(label=tr("cg_root_joint"),al="left",h=20)
         self.cw_jf=cmds.textField(h=24)
         cw_jb=cmds.button(label=tr("cg_set_sel"),h=24,w=110,c=lambda*a:self._cw_set("joint"))
 
-        cw_sep1=cmds.separator(h=6,st="in")
+        cw_sep1=cmds.separator(h=8,st="in")
 
-        # Preset buttons
-        cw_pl=cmds.text(label=tr("cg_preset"),al="left",h=20)
-        self.cw_preset_row=cmds.rowLayout(nc=len(CAGE_PRESET_ORDER),adj=1)
-        self._cw_preset_btns=[]
-        for pid in CAGE_PRESET_ORDER:
-            b=cmds.button(label=cage_preset_label(pid),h=24,
-                          c=lambda*a,p=pid:self._cw_apply_preset(p))
-            self._cw_preset_btns.append(b)
-        cmds.setParent("..")
-
-        cw_sep2=cmds.separator(h=6,st="in")
-
-        # Per-bone mode (scrollable list, populated dynamically)
-        cw_bml=cmds.text(label=tr("cg_per_bone"),al="left",h=20)
-        self.cw_bone_col=cmds.columnLayout(adj=True,h=100)
-        self._cw_bone_menus=[]
-        cmds.text(label="  (Set root joint to populate)",al="left",h=20,en=False)
-        cmds.setParent("..")
-
-        cw_sep3=cmds.separator(h=6,st="in")
-
-        # Cage Options
-        cw_ofl=cmds.rowLayout(nc=4,adj=2,cw=[(1,80),(3,80),(4,36)])
-        cmds.text(label=tr("cg_offset"))
-        self.cw_off=cmds.floatField(v=0.05,pre=3,min=0.0,max=1.0,h=22)
-        cmds.text(label=tr("cg_subdivs"))
-        self.cw_sub=cmds.intField(v=8,min=2,max=30,h=22)
-        cmds.setParent("..")
-
-        self.cw_del_cb=cmds.checkBox(label=tr("cg_auto_delete"),v=True,h=20)
-
-        cw_sep4=cmds.separator(h=6,st="in")
-
-        # Action buttons
-        cw_btn_go=cmds.button(label=tr("cg_generate"),h=36,bgc=(0.35,0.55,0.35),
-                              c=lambda*a:self._do_cw_full())
-        cw_btn_pv=cmds.button(label=tr("cg_preview"),h=28,
-                              c=lambda*a:self._do_cw_preview())
+        _open_label = "\u30dc\u30fc\u30f3\u7de8\u96c6\u30fb\u30b1\u30fc\u30b8\u751f\u6210" if _LANG == "ja" else "Bone edit / Cage generation"
+        cw_open_btn=cmds.button(label=_open_label, h=40, bgc=(0.35,0.55,0.35),
+                                c=lambda*a:self._cw_open_bone_editor())
+        self._cw_bone_summary=cmds.text(label="", al="center", h=18,
+                                         fn="smallPlainLabelFont", en=False)
 
         cmds.formLayout(cwfl,e=True,
             af=[(cw_title,"top",8),(cw_title,"left",4),(cw_title,"right",4),
                 (cw_ml,"left",4),(self.cw_mf,"left",4),(cw_mb,"right",4),
                 (cw_jl,"left",4),(self.cw_jf,"left",4),(cw_jb,"right",4),
                 (cw_sep1,"left",4),(cw_sep1,"right",4),
-                (cw_pl,"left",4),(self.cw_preset_row,"left",4),(self.cw_preset_row,"right",4),
-                (cw_sep2,"left",4),(cw_sep2,"right",4),
-                (cw_bml,"left",4),(self.cw_bone_col,"left",4),(self.cw_bone_col,"right",4),
-                (cw_sep3,"left",4),(cw_sep3,"right",4),
-                (cw_ofl,"left",4),(cw_ofl,"right",4),
-                (self.cw_del_cb,"left",8),
-                (cw_sep4,"left",4),(cw_sep4,"right",4),
-                (cw_btn_go,"left",4),(cw_btn_go,"right",4),
-                (cw_btn_pv,"left",4),(cw_btn_pv,"right",4),(cw_btn_pv,"bottom",4)],
+                (cw_open_btn,"left",4),(cw_open_btn,"right",4),
+                (self._cw_bone_summary,"left",4),(self._cw_bone_summary,"right",4)],
             ac=[(cw_ml,"top",8,cw_title),
                 (self.cw_mf,"top",2,cw_ml),(self.cw_mf,"right",4,cw_mb),(cw_mb,"top",2,cw_ml),
                 (cw_jl,"top",12,self.cw_mf),
                 (self.cw_jf,"top",2,cw_jl),(self.cw_jf,"right",4,cw_jb),(cw_jb,"top",2,cw_jl),
                 (cw_sep1,"top",8,self.cw_jf),
-                (cw_pl,"top",4,cw_sep1),(self.cw_preset_row,"top",2,cw_pl),
-                (cw_sep2,"top",4,self.cw_preset_row),
-                (cw_bml,"top",4,cw_sep2),(self.cw_bone_col,"top",2,cw_bml),
-                (cw_sep3,"top",4,self.cw_bone_col),
-                (cw_ofl,"top",4,cw_sep3),
-                (self.cw_del_cb,"top",6,cw_ofl),
-                (cw_sep4,"top",6,self.cw_del_cb),
-                (cw_btn_go,"top",4,cw_sep4),
-                (cw_btn_pv,"top",4,cw_btn_go)])
+                (cw_open_btn,"top",8,cw_sep1),
+                (self._cw_bone_summary,"top",6,cw_open_btn)])
         cmds.setParent("..")
 
         # ---- Data Check ----
         cfl=cmds.formLayout()
-
-        # Section 1: Weight Decimal Check
         dt1=cmds.text(label=tr("decimal_title"),al="left",h=18,fn="boldLabelFont")
         dd1=cmds.text(label=tr("decimal_desc"),al="left",h=16,fn="smallPlainLabelFont")
         ctl=cmds.text(label=tr("digit_unit"),h=20)
         self.ctf=cmds.floatField(v=0.01,pre=4,w=70,h=20)
         b_dig=cmds.button(label=tr("check_digit"),h=22,w=70,c=lambda*a:self._do_chk_dig())
         b_cln=cmds.button(label=tr("clean_digit"),h=22,w=100,bgc=(0.4,0.55,0.7),c=lambda*a:self._do_clean_dig())
-
         sep_c1=cmds.separator(h=10,st="in")
-
-        # Section 2: Influence Count Check
         it1=cmds.text(label=tr("inf_title"),al="left",h=18,fn="boldLabelFont")
         id1=cmds.text(label=tr("inf_desc"),al="left",h=16,fn="smallPlainLabelFont")
         iml=cmds.text(label=tr("inf_max"),h=20)
         self.inf_f=cmds.intField(v=4,min=1,max=20,w=40,h=20)
         b_inf=cmds.button(label=tr("check_inf"),h=22,w=70,c=lambda*a:self._do_chk_inf())
-
         sep_c2=cmds.separator(h=10,st="in")
-
-        # Section 3: Same Position Check
         b_same=cmds.button(label=tr("check_samepos"),h=28,c=lambda*a:check_same_position())
-
         sep_c3=cmds.separator(h=10,st="in")
-
-        # Section 4: Create Joint Set
         b_set=cmds.button(label=tr("create_set"),h=28,c=lambda*a:create_skin_joint_set())
-
         cmds.formLayout(cfl,e=True,
             af=[(dt1,"top",8),(dt1,"left",4),(dt1,"right",4),
                 (dd1,"left",4),(dd1,"right",4),
-                (ctl,"left",4),(self.ctf,"left",4),
-                (b_cln,"right",4),
+                (ctl,"left",4),(self.ctf,"left",4),(b_cln,"right",4),
                 (sep_c1,"left",4),(sep_c1,"right",4),
-                (it1,"left",4),(it1,"right",4),
-                (id1,"left",4),(id1,"right",4),
-                (iml,"left",4),
-                (sep_c2,"left",4),(sep_c2,"right",4),
+                (it1,"left",4),(it1,"right",4),(id1,"left",4),(id1,"right",4),
+                (iml,"left",4),(sep_c2,"left",4),(sep_c2,"right",4),
                 (b_same,"left",4),(b_same,"right",4),
                 (sep_c3,"left",4),(sep_c3,"right",4),
                 (b_set,"left",4),(b_set,"right",4)],
-            ac=[(dd1,"top",2,dt1),
-                (ctl,"top",4,dd1),
+            ac=[(dd1,"top",2,dt1),(ctl,"top",4,dd1),
                 (self.ctf,"top",4,dd1),(self.ctf,"left",6,ctl),
                 (b_dig,"top",4,dd1),(b_dig,"left",6,self.ctf),
                 (b_cln,"top",4,dd1),(b_cln,"left",4,b_dig),
-                (sep_c1,"top",8,ctl),
-                (it1,"top",8,sep_c1),
-                (id1,"top",2,it1),
-                (iml,"top",4,id1),
-                (self.inf_f,"top",4,id1),(self.inf_f,"left",6,iml),
+                (sep_c1,"top",8,ctl),(it1,"top",8,sep_c1),(id1,"top",2,it1),
+                (iml,"top",4,id1),(self.inf_f,"top",4,id1),(self.inf_f,"left",6,iml),
                 (b_inf,"top",4,id1),(b_inf,"left",6,self.inf_f),
-                (sep_c2,"top",8,iml),
-                (b_same,"top",8,sep_c2),
-                (sep_c3,"top",8,b_same),
-                (b_set,"top",8,sep_c3)])
+                (sep_c2,"top",8,iml),(b_same,"top",8,sep_c2),
+                (sep_c3,"top",8,b_same),(b_set,"top",8,sep_c3)])
         cmds.setParent("..")
 
         cmds.tabLayout(self.tabs,e=True,
@@ -285,15 +223,19 @@ class DoraSkinWeightUI(object):
         set_language("ja" if v=="\u65e5\u672c\u8a9e" else "en")
         cmds.evalDeferred(self.show)
 
-    # -- How To Use --
     def _htu(self):
         if cmds.window(self.HTU_WIN,exists=True): cmds.deleteUI(self.HTU_WIN)
-        cmds.window(self.HTU_WIN,title=tr("htu_title"),wh=(520,500),s=True)
+        cmds.window(self.HTU_WIN,title=tr("htu_title"),wh=(520,540),s=True)
         cmds.columnLayout(adj=True)
-        cmds.scrollField(text=tr("htu_content",ver=VERSION),ed=False,ww=True,h=460,fn="fixedWidthFont")
+        htu_text = tr("htu_content", ver=VERSION,
+                       smooth="\u2581\u2583\u2585\u2587",
+                       sharp="\u2581\u2581\u2585\u2587",
+                       rigid="\u2581\u2581\u2588\u2587",
+                       fixed="\u2581\u2581\u2588\u2588",
+                       skip="\u2500\u2500")
+        cmds.scrollField(text=htu_text,ed=False,ww=True,h=500,fn="fixedWidthFont")
         cmds.showWindow(self.HTU_WIN)
 
-    # -- Lists --
     def _rl(self,*a):
         items=get_dsw_list()
         cmds.textScrollList(self.il,e=True,ra=True)
@@ -324,7 +266,6 @@ class DoraSkinWeightUI(object):
             jm={o:n for o,n in zip(self._jno,self._jnn) if o!=n}
         return jm if jm else None
 
-    # -- Actions --
     def _do_imp(self):
         dn=cmds.textField(self.inf,q=True,tx=True)
         if not dn: show_status(tr("warn_no_dsw"),True); return
@@ -337,8 +278,7 @@ class DoraSkinWeightUI(object):
 
     def _do_exp(self, mode):
         n=cmds.textField(self.enf,q=True,tx=True)
-        if not n:
-            show_status(tr("warn_no_name"),True); return
+        if not n: show_status(tr("warn_no_name"),True); return
         dsw_export("{0} {1}".format(mode,n)); self._rl()
 
     def _do_del(self):
@@ -346,8 +286,7 @@ class DoraSkinWeightUI(object):
         if not s: show_status(tr("warn_no_dsw"),True); return
         r=cmds.confirmDialog(title="Delete DSW", message=tr("warn_delete_confirm").format(s[0]),
                              button=["OK","Cancel"], defaultButton="Cancel", cancelButton="Cancel")
-        if r=="OK":
-            delete_dsw(s[0]); self._rl()
+        if r=="OK": delete_dsw(s[0]); self._rl()
 
     def _do_vp(self):
         dn=cmds.textField(self.inf,q=True,tx=True)
@@ -365,7 +304,10 @@ class DoraSkinWeightUI(object):
     def _do_bf_reset(self):
         body_fit_reset()
 
-    # -- Cage Weight --
+    # ======================================================================
+    # Cage Weight (v5)
+    # ======================================================================
+
     def _cw_set(self, kind):
         sel = cmds.ls(sl=True, long=True)
         if not sel:
@@ -375,123 +317,336 @@ class DoraSkinWeightUI(object):
             cmds.textField(self.cw_mf, e=True, tx=simple_obj_name(node))
         elif kind == "joint":
             if cmds.nodeType(node) != "joint":
-                # Try to find joint in selection
                 joints = cmds.ls(sel, type="joint")
                 if joints:
                     node = joints[0]
                 else:
                     show_status("Select a joint.", True); return
             cmds.textField(self.cw_jf, e=True, tx=simple_obj_name(node))
-            self._cw_rebuild_bone_ui(node)
+            self._cw_build_tree(node)
 
-    def _cw_rebuild_bone_ui(self, root_joint):
-        """Rebuild per-bone mode dropdowns from the joint chain."""
-        chain = _get_bone_chain_ordered(root_joint)
-        num_segments = len(chain) - 1
-        if num_segments < 1:
-            return
+    def _cw_build_tree(self, root_joint):
+        """Parse bone tree and update summary."""
+        tree = _get_bone_tree(root_joint)
+        branches = _extract_branches(tree)
+        all_joints = _flatten_tree(tree)
+        self._cw_bone_tree = tree
+        self._cw_branches = branches
+        self._cw_joint_chain = all_joints
+        self._cw_per_bone_menus_map = {}
+        for j in all_joints:
+            self._cw_per_bone_menus_map[j] = "smooth"
+        summary = "{0} joints, {1} branches".format(len(all_joints), len(branches))
+        cmds.text(self._cw_bone_summary, e=True, label=summary, en=True)
+        show_status(summary)
 
-        # Clear existing
-        children = cmds.columnLayout(self.cw_bone_col, q=True, ca=True) or []
-        for c in children:
-            cmds.deleteUI(c)
-
-        self._cw_bone_menus = []
-        self._cw_joint_chain = chain
-
-        cmds.setParent(self.cw_bone_col)
-        for i in range(num_segments):
-            jname = simple_obj_name(chain[i])
-            row = cmds.rowLayout(nc=3, adj=2, cw=[(1,70),(3,120)], h=24)
-            cmds.text(label="  {0}".format(jname), al="left")
-            cmds.text(label="")
-            menu = cmds.optionMenu(h=22)
-            for mid in CAGE_MODE_ORDER:
-                cmds.menuItem(label=cage_mode_label(mid))
-            cmds.setParent("..")
-            self._cw_bone_menus.append(menu)
-        cmds.setParent("..")
-
-    def _cw_get_modes(self):
-        """Read per-bone modes from the UI dropdowns."""
-        modes = []
-        for menu in self._cw_bone_menus:
-            idx = cmds.optionMenu(menu, q=True, sl=True) - 1
-            if 0 <= idx < len(CAGE_MODE_ORDER):
-                modes.append(CAGE_MODE_ORDER[idx])
-            else:
-                modes.append("soft")
-        return modes
-
-    def _cw_apply_preset(self, preset_id):
-        """Apply a preset to all bone mode dropdowns."""
-        num_segs = len(self._cw_bone_menus)
-        if num_segs == 0:
-            show_status(tr("cg_no_joint"), True); return
-        modes = adapt_preset_modes(preset_id, num_segs)
-        for i, menu in enumerate(self._cw_bone_menus):
-            mode = modes[i]
-            idx = CAGE_MODE_ORDER.index(mode) + 1 if mode in CAGE_MODE_ORDER else 1
-            cmds.optionMenu(menu, e=True, sl=idx)
-        show_status("Preset: {0}".format(cage_preset_label(preset_id)))
-
-    def _do_cw_full(self):
-        """Execute full cage weight pipeline."""
+    def _cw_open_bone_editor(self):
+        """Open the unified bone edit + cage generation window."""
         mesh = cmds.textField(self.cw_mf, q=True, tx=True)
         joint = cmds.textField(self.cw_jf, q=True, tx=True)
         if not joint:
-            show_status(tr("cg_no_joint"), True); return
-        if not mesh:
-            show_status(tr("cg_no_mesh"), True); return
-        modes = self._cw_get_modes()
+            show_status("Set root joint first.", True); return
+        if not self._cw_bone_tree:
+            self._cw_build_tree(joint)
+
+        if cmds.window(self.CW_BONE_WIN, exists=True):
+            cmds.deleteUI(self.CW_BONE_WIN)
+
+        _title = "\u30dc\u30fc\u30f3\u7de8\u96c6\u30fb\u30b1\u30fc\u30b8\u751f\u6210" if _LANG == "ja" else "Bone Edit / Cage Generation"
+        cmds.window(self.CW_BONE_WIN, title=_title, wh=(500, 660), s=True)
+        main_col = cmds.columnLayout(adj=True)
+
+        # Header
+        _hint = "\u30dc\u30fc\u30f3\u540d\u30af\u30ea\u30c3\u30af\u3067\u30b7\u30fc\u30f3\u5185\u9078\u629e" if _LANG == "ja" else "Click bone name to select in scene"
+        cmds.text(label=_hint, al="center", h=20, fn="smallPlainLabelFont")
+        cmds.separator(h=4, st="in")
+
+        # Scrollable bone list
+        scroll = cmds.scrollLayout(h=300, cr=True)
+        cmds.columnLayout(adj=True)
+
+        self._cw_bone_editor_menus = {}
+        self._cw_branch_checks = []
+
+        branch_tip_set = set()
+        for br in self._cw_branches:
+            if br:
+                branch_tip_set.add(br[-1])
+
+        def _build_rows(node, depth=0):
+            jname = node["joint"].split("|")[-1]
+            indent = "  " * depth
+            display = indent + jname
+            jpath = node["joint"]
+
+            row = cmds.rowLayout(nc=4, adj=1, h=26, cw=[(2, 140), (3, 28), (4, 28)])
+
+            cmds.button(label=display, al="left", h=24,
+                        c=lambda *a, jp=jpath: self._cw_select_joint(jp))
+
+            menu = cmds.optionMenu(h=22, w=140)
+            for mid in CAGE_MODE_ORDER:
+                cmds.menuItem(label=cage_mode_label(mid))
+            current = self._cw_per_bone_menus_map.get(jpath, "smooth")
+            if current in CAGE_MODE_ORDER:
+                cmds.optionMenu(menu, e=True, sl=CAGE_MODE_ORDER.index(current) + 1)
+            else:
+                cmds.optionMenu(menu, e=True, sl=1)
+
+            if jpath in branch_tip_set:
+                cb = cmds.checkBox(label="", v=True, h=22, w=28)
+                self._cw_branch_checks.append((jpath, cb))
+            else:
+                cmds.text(label="", w=28)
+
+            cmds.text(label="", w=28)
+            cmds.setParent("..")
+
+            self._cw_bone_editor_menus[jpath] = menu
+            for child in node["children"]:
+                _build_rows(child, depth + 1)
+
+        _build_rows(self._cw_bone_tree, 0)
+        cmds.setParent(main_col)
+
+        # --- Generated cage list (v5) ---
+        cmds.separator(h=6, st="in")
+        _cage_list_label = "\u751f\u6210\u6e08\u307f\u30b1\u30fc\u30b8" if _LANG == "ja" else "Generated Cages"
+        cmds.text(label=_cage_list_label, al="left", h=20, fn="boldLabelFont")
+        self._cw_cage_list = cmds.textScrollList(h=70, ams=False,
+                                                   sc=lambda *a: self._cw_cage_list_select())
+        self._cw_refresh_cage_list()
+
+        _del_cage_label = "\u9078\u629e\u30b1\u30fc\u30b8\u3092\u524a\u9664" if _LANG == "ja" else "Delete selected cage"
+        cmds.button(label=_del_cage_label, h=22,
+                    c=lambda *a: self._cw_delete_selected_cage())
+
+        # --- Options ---
+        cmds.separator(h=6, st="in")
+
+        # Offset
+        off_row = cmds.rowLayout(nc=2, adj=2, h=26, cw=[(1, 80)])
+        _off_l = "\u30aa\u30d5\u30bb\u30c3\u30c8" if _LANG == "ja" else "Offset"
+        cmds.text(label=_off_l)
+        self.cw_off = cmds.floatField(v=0.05, pre=3, min=0.0, max=1.0, h=22)
+        cmds.setParent("..")
+
+        # Subdivisions: Axis / per-segment rings
+        sub_row = cmds.rowLayout(nc=6, adj=6, h=26,
+                                  cw=[(1,80),(2,50),(3,50),(4,70),(5,50),(6,10)])
+        _sub_l = "\u5206\u5272\u6570" if _LANG == "ja" else "Subdivs"
+        cmds.text(label=_sub_l)
+        _axis_l = "\u5186\u5468" if _LANG == "ja" else "Axis"
+        cmds.text(label=_axis_l, fn="smallPlainLabelFont")
+        self.cw_sub_axis = cmds.intField(v=8, min=3, max=32, h=22, w=40)
+        _height_l = "\u9aa8\u3042\u305f\u308a" if _LANG == "ja" else "Per bone"
+        cmds.text(label=_height_l, fn="smallPlainLabelFont")
+        self.cw_sub_height = cmds.intField(v=4, min=1, max=16, h=22, w=40)
+        cmds.text(label="")
+        cmds.setParent("..")
+
+        _del_l = "\u8ee2\u5199\u5f8c\u306b\u30b1\u30fc\u30b8\u3092\u81ea\u52d5\u524a\u9664" if _LANG == "ja" else "Auto-delete cage after transfer"
+        self.cw_del_cb = cmds.checkBox(label=_del_l, v=False, h=22)
+
+        # --- Action buttons ---
+        cmds.separator(h=6, st="in")
+        cmds.rowLayout(nc=2, adj=1, h=40, cw=[(2, 200)])
+        _gen_l = "\u30b1\u30fc\u30b8\u751f\u6210" if _LANG == "ja" else "Generate cage"
+        cmds.button(label=_gen_l, h=36,
+                    c=lambda *a: self._cw_apply_and_preview())
+        _apply_l = "\u9069\u7528\uff08\u8ee2\u5199\uff09" if _LANG == "ja" else "Apply (transfer)"
+        cmds.button(label=_apply_l, h=36, bgc=(0.35, 0.55, 0.35),
+                    c=lambda *a: self._cw_apply_and_execute())
+        cmds.setParent("..")
+
+        cmds.showWindow(self.CW_BONE_WIN)
+
+    def _cw_select_joint(self, joint_path):
+        short = joint_path.split("|")[-1]
+        try:
+            if cmds.objExists(short):
+                cmds.select(short, r=True)
+            elif cmds.objExists(joint_path):
+                cmds.select(joint_path, r=True)
+        except Exception:
+            pass
+
+    def _cw_read_editor_modes(self):
+        if not hasattr(self, '_cw_bone_editor_menus'):
+            return
+        for joint_path, menu in self._cw_bone_editor_menus.items():
+            try:
+                idx = cmds.optionMenu(menu, q=True, sl=True) - 1
+                if 0 <= idx < len(CAGE_MODE_ORDER):
+                    self._cw_per_bone_menus_map[joint_path] = CAGE_MODE_ORDER[idx]
+                else:
+                    self._cw_per_bone_menus_map[joint_path] = "smooth"
+            except Exception:
+                pass
+
+    def _cw_get_per_bone_modes(self):
+        return dict(self._cw_per_bone_menus_map)
+
+    def _cw_get_target_branches(self):
+        if not self._cw_branch_checks:
+            return None
+        checked = []
+        for bi, branch in enumerate(self._cw_branches):
+            if not branch:
+                continue
+            tip = branch[-1]
+            for joint_path, cb in self._cw_branch_checks:
+                if joint_path == tip:
+                    try:
+                        if cmds.checkBox(cb, q=True, v=True):
+                            checked.append(bi)
+                    except Exception:
+                        checked.append(bi)
+                    break
+        if len(checked) == len(self._cw_branches):
+            return None
+        return checked if checked else None
+
+    # --- v5: Cage list management ---
+
+    def _cw_refresh_cage_list(self):
+        """Update the cage list widget with current tracked cages."""
+        if not hasattr(self, '_cw_cage_list'):
+            return
+        try:
+            cmds.textScrollList(self._cw_cage_list, e=True, ra=True)
+        except Exception:
+            return
+        for cage_name, branch_joints in self._cw_generated_cages:
+            exists = cmds.objExists(cage_name)
+            tip = branch_joints[-1].split("|")[-1] if branch_joints else "?"
+            status = "" if exists else " [DELETED]"
+            label = "{0} ({1}){2}".format(cage_name, tip, status)
+            cmds.textScrollList(self._cw_cage_list, e=True, a=label)
+
+    def _cw_cage_list_select(self):
+        """When user clicks a cage in the list, select it in the scene."""
+        idx_list = cmds.textScrollList(self._cw_cage_list, q=True, sii=True) or []
+        if not idx_list:
+            return
+        idx = idx_list[0] - 1
+        if idx < 0 or idx >= len(self._cw_generated_cages):
+            return
+        cage_name = self._cw_generated_cages[idx][0]
+        if cmds.objExists(cage_name):
+            cmds.select(cage_name, r=True)
+        else:
+            show_status("Cage not found: {0}".format(cage_name), True)
+
+    def _cw_delete_selected_cage(self):
+        """Delete the selected cage from scene and tracking list."""
+        idx_list = cmds.textScrollList(self._cw_cage_list, q=True, sii=True) or []
+        if not idx_list:
+            return
+        idx = idx_list[0] - 1
+        if idx < 0 or idx >= len(self._cw_generated_cages):
+            return
+        cage_name = self._cw_generated_cages[idx][0]
+        if cmds.objExists(cage_name):
+            try:
+                cmds.delete(cage_name)
+            except Exception:
+                pass
+        self._cw_generated_cages.pop(idx)
+        self._cw_refresh_cage_list()
+        show_status("Cage deleted: {0}".format(cage_name))
+
+    # --- v5: Preview and Execute ---
+
+    def _cw_apply_and_preview(self):
+        self._cw_read_editor_modes()
+        self._do_cw_preview()
+
+    def _cw_apply_and_execute(self):
+        self._cw_read_editor_modes()
+        self._do_cw_full()
+
+    def _do_cw_preview(self):
+        """Generate cage meshes (no transfer) for preview/editing.
+        v5: stores generated cage names in _cw_generated_cages."""
+        mesh = cmds.textField(self.cw_mf, q=True, tx=True)
+        joint = cmds.textField(self.cw_jf, q=True, tx=True)
+        if not joint: show_status("Set root joint.", True); return
+        if not mesh: show_status("Set target mesh.", True); return
         offset = cmds.floatField(self.cw_off, q=True, v=True)
-        subdivs = cmds.intField(self.cw_sub, q=True, v=True)
+        sides = cmds.intField(self.cw_sub_axis, q=True, v=True)
+        subdivs = cmds.intField(self.cw_sub_height, q=True, v=True)
+        target_branches = self._cw_get_target_branches()
+        per_bone_modes = self._cw_get_per_bone_modes()
+
+        # Delete previously tracked cages
+        for old_cage, _bj in self._cw_generated_cages:
+            if cmds.objExists(old_cage):
+                try:
+                    cmds.delete(old_cage)
+                except Exception:
+                    pass
+        self._cw_generated_cages = []
+
+        cage_results = generate_cage_mesh(
+            mesh, joint, subdivisions_per_seg=subdivs, offset=offset,
+            target_branches=target_branches, sides=sides)
+        if not cage_results:
+            show_status("Failed to generate cage.", True)
+            self._cw_refresh_cage_list()
+            return
+
+        # Apply per-bone weights and track results
+        ok = 0
+        for cage_transform, branch_joints in cage_results:
+            sc = apply_cage_weights_tree(cage_transform, branch_joints, per_bone_modes)
+            if sc:
+                ok += 1
+                self._cw_generated_cages.append((cage_transform, branch_joints))
+
+        self._cw_refresh_cage_list()
+        show_status("{0} cage(s) generated".format(ok))
+
+    def _do_cw_full(self):
+        """Transfer weights to target mesh via direct bone projection (v6)."""
+        mesh = cmds.textField(self.cw_mf, q=True, tx=True)
+        joint = cmds.textField(self.cw_jf, q=True, tx=True)
+        if not joint: show_status("Set root joint.", True); return
+        if not mesh: show_status("Set target mesh.", True); return
         del_cage = cmds.checkBox(self.cw_del_cb, q=True, v=True)
+        per_bone_modes = self._cw_get_per_bone_modes()
 
-        result = cage_weight_full(
-            mesh=mesh, root_joint=joint, modes=modes,
-            subdivisions=subdivs, offset=offset, delete_cage=del_cage)
+        if not self._cw_generated_cages:
+            show_status("No cage meshes generated. Generate first.", True)
+            return
 
-        if result:
+        rpt, ok_count, fail_count = transfer_tracked_cages(
+            self._cw_generated_cages, mesh, per_bone_modes,
+            delete_cage=del_cage)
+
+        # Clear tracking for deleted cages
+        if del_cage:
+            self._cw_generated_cages = [
+                (c, bj) for c, bj in self._cw_generated_cages
+                if cmds.objExists(c)
+            ]
+
+        self._cw_refresh_cage_list()
+
+        if ok_count > 0:
             show_status(tr("cg_done"))
         else:
             show_status(tr("cg_fail"), True)
 
-    def _do_cw_preview(self):
-        """Generate cage mesh only (no transfer), for preview."""
-        mesh = cmds.textField(self.cw_mf, q=True, tx=True)
-        joint = cmds.textField(self.cw_jf, q=True, tx=True)
-        if not joint:
-            show_status(tr("cg_no_joint"), True); return
-        if not mesh:
-            show_status(tr("cg_no_mesh"), True); return
-
-        offset = cmds.floatField(self.cw_off, q=True, v=True)
-        subdivs = cmds.intField(self.cw_sub, q=True, v=True)
-        modes = self._cw_get_modes()
-
-        cage_transform, joints = generate_cage_mesh(
-            mesh, joint, subdivisions=subdivs, offset=offset)
-        if cage_transform:
-            sc = apply_cage_weights(cage_transform, joints, modes)
-            if sc:
-                show_status("Preview: {0}".format(cage_transform))
-            else:
-                show_status("Preview cage created but weight failed.", True)
-        else:
-            show_status("Failed to generate cage.", True)
+        rpt.summary()
+        rpt.show_window()
 
     def _do_chk_dig(self):
-        u=cmds.floatField(self.ctf,q=True,v=True)
-        check_weight_digit(u)
-
+        u=cmds.floatField(self.ctf,q=True,v=True); check_weight_digit(u)
     def _do_clean_dig(self):
-        u=cmds.floatField(self.ctf,q=True,v=True)
-        clean_weight_digit(u)
-
+        u=cmds.floatField(self.ctf,q=True,v=True); clean_weight_digit(u)
     def _do_chk_inf(self):
-        n=cmds.intField(self.inf_f,q=True,v=True)
-        check_influence_count(n)
+        n=cmds.intField(self.inf_f,q=True,v=True); check_influence_count(n)
 
     # -- Joint Editor --
     def _jne(self):
@@ -547,5 +702,3 @@ class DoraSkinWeightUI(object):
         self._jne_upd()
     def _jne_rst(self):
         self._jnn=list(self._jno); self._jne_upd()
-
-

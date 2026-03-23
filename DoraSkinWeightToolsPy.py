@@ -33,7 +33,7 @@ _S = {
     "how_to_use":       {"en":"How to Use", "ja":"How to Use"},
     "tab_import":       {"en":"Import", "ja":"\u30a4\u30f3\u30dd\u30fc\u30c8"},
     "tab_export":       {"en":"Export", "ja":"\u30a8\u30af\u30b9\u30dd\u30fc\u30c8"},
-    "tab_body_fit":     {"en":"Body Fit (BETA)", "ja":"\u4f53\u578b\u5408\u308f\u305b (BETA)"},
+    "tab_body_fit":     {"en":"Body Fit", "ja":"\u4f53\u578b\u5408\u308f\u305b"},
     "tab_check":        {"en":"Data Check", "ja":"\u30c7\u30fc\u30bf\u30c1\u30a7\u30c3\u30af"},
     "dsw_list":         {"en":"DSW List", "ja":"DSW \u30ea\u30b9\u30c8"},
     "import_mode":      {"en":"Import Mode", "ja":"\u30a4\u30f3\u30dd\u30fc\u30c8\u30e2\u30fc\u30c9"},
@@ -88,7 +88,7 @@ _S = {
     "warn_no_sel":      {"en":"Nothing selected.", "ja":"\u4f55\u3082\u9078\u629e\u3055\u308c\u3066\u3044\u307e\u305b\u3093\u3002"},
     "warn_set_both":    {"en":"Please set both Source and Target.", "ja":"\u30bd\u30fc\u30b9\u3068\u30bf\u30fc\u30b2\u30c3\u30c8\u306e\u4e21\u65b9\u3092\u30bb\u30c3\u30c8\u3057\u3066\u304f\u3060\u3055\u3044\u3002"},
     "warn_delete_confirm":{"en":"Delete selected DSW?\n{0}", "ja":"\u9078\u629e\u3057\u305fDSW\u3092\u524a\u9664\u3057\u307e\u3059\u304b\uff1f\n{0}"},
-    "tab_cage":         {"en":"Cage Weight (BETA)", "ja":"\u30b1\u30fc\u30b8\u30a6\u30a7\u30a4\u30c8 (BETA)"},
+    "tab_cage":         {"en":"Cage Weight", "ja":"\u30b1\u30fc\u30b8\u30a6\u30a7\u30a4\u30c8"},
     "cg_preset":        {"en":"Preset", "ja":"\u30d7\u30ea\u30bb\u30c3\u30c8"},
     "cg_per_bone":      {"en":"Per-Bone Mode", "ja":"\u30dc\u30fc\u30f3\u5225\u30e2\u30fc\u30c9"},
     "cg_root_joint":    {"en":"Root Joint:", "ja":"\u30eb\u30fc\u30c8\u30b8\u30e7\u30a4\u30f3\u30c8:"},
@@ -126,12 +126,46 @@ _S = {
             "1. Export source weights.\n"
             "2. Select vertices on target mesh.\n"
             "3. Select DSW, click [Vertex Paste].\n\n"
-            "--- BODY TRANSFER ---\n"
-            "1. [Body Transfer] tab.\n"
+            "--- BODY FIT ---\n"
+            "1. [Body Fit] tab.\n"
             "2. Set Body A (source) and Body B (target).\n"
-            "3. Click [Transfer Weights (A->B)].\n\n"
+            "3. Click [Fit Joints (A->B)].\n\n"
+            "--- CAGE WEIGHT (BETA) ---\n"
+            "Auto-generate skin weights along a bone chain.\n\n"
+            "  [Setup]\n"
+            "  1. Select target mesh > [< Set Selected].\n"
+            "  2. Select root joint > [< Set Selected].\n"
+            "  3. Click [Bone edit / Cage generation].\n\n"
+            "  [Bone Editor window]\n"
+            "  - Click bone name: selects it in scene.\n"
+            "  - Dropdown (per bone): choose weight blend mode.\n"
+            "  - Checkbox (branch tip): include/exclude branch.\n\n"
+            "  [Weight Modes]\n"
+            "  The symbols show how weight transitions\n"
+            "  from parent bone to child bone:\n\n"
+            "    {smooth}  Smooth : gradual S-curve blend.\n"
+            "    {sharp}   Sharp  : tight blend at midpoint.\n"
+            "    {rigid}   Rigid  : near-instant switch.\n"
+            "    {fixed}   50/50  : hard cut at midpoint.\n"
+            "    {skip}    Skip   : leave weights unchanged.\n\n"
+            "  Use Skip for rigid parts (weapons, props)\n"
+            "  that should not receive new weights.\n\n"
+            "  [Generate & Transfer]\n"
+            "  1. Set modes, then click [Generate cage].\n"
+            "     -> Preview cage meshes appear in scene.\n"
+            "     -> 'Generated Cages' list shows them.\n"
+            "  2. Click a cage in the list to select it.\n"
+            "  3. When satisfied, click [Apply (transfer)].\n"
+            "     -> Weights are written directly to\n"
+            "        the target mesh. A report window\n"
+            "        shows the result.\n\n"
+            "  [Options]\n"
+            "  - Offset: cage expansion (0.0 - 1.0).\n"
+            "  - Subdivs Axis: cross-section divisions.\n"
+            "  - Subdivs Per bone: rings per bone segment.\n"
+            "  - Auto-delete cage: remove cages after transfer.\n\n"
             "--- DATA CHECK ---\n"
-            "- Weight Precision: finds weights finer than threshold (default 0.01).\n"
+            "- Weight Precision: finds weights finer than threshold.\n"
             "- SamePosition: finds overlapping verts with different weights.\n"
             "- Create SkinJoint Set: makes a joint selection set.\n\n"
             "--- TIPS ---\n"
@@ -157,12 +191,45 @@ _S = {
             "1. \u30bd\u30fc\u30b9\u306e\u30a6\u30a7\u30a4\u30c8\u3092\u30a8\u30af\u30b9\u30dd\u30fc\u30c8\u3002\n"
             "2. \u30bf\u30fc\u30b2\u30c3\u30c8\u306e\u9802\u70b9\u3092\u9078\u629e\u3002\n"
             "3. DSW\u3092\u9078\u629e\u3057\u3001[\u9802\u70b9\u30da\u30fc\u30b9\u30c8]\u3002\n\n"
-            "--- \u4f53\u578b\u8ee2\u9001 ---\n"
-            "1. [\u4f53\u578b\u8ee2\u9001]\u30bf\u30d6\u3002\n"
+            "--- \u4f53\u578b\u5408\u308f\u305b ---\n"
+            "1. [\u4f53\u578b\u5408\u308f\u305b]\u30bf\u30d6\u3002\n"
             "2. \u4f53\u578bA(\u30bd\u30fc\u30b9)\u3068\u4f53\u578bB(\u30bf\u30fc\u30b2\u30c3\u30c8)\u3092\u30bb\u30c3\u30c8\u3002\n"
-            "3. [\u30a6\u30a7\u30a4\u30c8\u8ee2\u9001(A\u2192B)]\u3002\n\n"
+            "3. [\u30b8\u30e7\u30a4\u30f3\u30c8\u3092\u5408\u308f\u305b(A\u2192B)]\u3002\n\n"
+            "--- \u30b1\u30fc\u30b8\u30a6\u30a7\u30a4\u30c8 (BETA) ---\n"
+            "\u30dc\u30fc\u30f3\u30c1\u30a7\u30fc\u30f3\u306b\u6cbf\u3063\u3066\u30b9\u30ad\u30f3\u30a6\u30a7\u30a4\u30c8\u3092\u81ea\u52d5\u751f\u6210\u3002\n\n"
+            "  [\u6e96\u5099]\n"
+            "  1. \u30bf\u30fc\u30b2\u30c3\u30c8\u30e1\u30c3\u30b7\u30e5\u3092\u9078\u629e > [< \u9078\u629e\u3092\u30bb\u30c3\u30c8]\u3002\n"
+            "  2. \u30eb\u30fc\u30c8\u30b8\u30e7\u30a4\u30f3\u30c8\u3092\u9078\u629e > [< \u9078\u629e\u3092\u30bb\u30c3\u30c8]\u3002\n"
+            "  3. [\u30dc\u30fc\u30f3\u7de8\u96c6\u30fb\u30b1\u30fc\u30b8\u751f\u6210]\u3092\u30af\u30ea\u30c3\u30af\u3002\n\n"
+            "  [\u30dc\u30fc\u30f3\u30a8\u30c7\u30a3\u30bf\u30a6\u30a3\u30f3\u30c9\u30a6]\n"
+            "  - \u30dc\u30fc\u30f3\u540d\u30af\u30ea\u30c3\u30af: \u30b7\u30fc\u30f3\u5185\u3067\u9078\u629e\u3002\n"
+            "  - \u30c9\u30ed\u30c3\u30d7\u30c0\u30a6\u30f3(\u5404\u30dc\u30fc\u30f3): \u30a6\u30a7\u30a4\u30c8\u30d6\u30ec\u30f3\u30c9\u30e2\u30fc\u30c9\u3092\u9078\u629e\u3002\n"
+            "  - \u30c1\u30a7\u30c3\u30af\u30dc\u30c3\u30af\u30b9(\u30d6\u30e9\u30f3\u30c1\u5148\u7aef): \u30d6\u30e9\u30f3\u30c1\u306e\u542b\u3080/\u9664\u5916\u3002\n\n"
+            "  [\u30a6\u30a7\u30a4\u30c8\u30e2\u30fc\u30c9]\n"
+            "  \u8a18\u53f7\u306f\u89aa\u30dc\u30fc\u30f3\u304b\u3089\u5b50\u30dc\u30fc\u30f3\u3078\u306e\n"
+            "  \u30a6\u30a7\u30a4\u30c8\u9077\u79fb\u30d1\u30bf\u30fc\u30f3\u3092\u8868\u3057\u307e\u3059:\n\n"
+            "    {smooth}  \u306a\u3081\u3089\u304b : \u7dd1\u3084\u304b\u306aS\u5b57\u30ab\u30fc\u30d6\u3002\n"
+            "    {sharp}   \u304f\u3063\u304d\u308a : \u4e2d\u9593\u70b9\u3067\u6025\u306b\u5207\u66ff\u3002\n"
+            "    {rigid}   \u786c\u3044     : \u307b\u307c\u77ac\u6642\u306b\u5207\u66ff\u3002\n"
+            "    {fixed}   50/50    : \u4e2d\u9593\u70b9\u3067\u30cf\u30fc\u30c9\u30ab\u30c3\u30c8\u3002\n"
+            "    {skip}    \u30b9\u30ad\u30c3\u30d7 : \u30a6\u30a7\u30a4\u30c8\u5909\u66f4\u306a\u3057\u3002\n\n"
+            "  \u6b66\u5668\u306a\u3069\u306e\u786c\u3044\u30d1\u30fc\u30c4\u306b\u306f\u30b9\u30ad\u30c3\u30d7\u3092\u4f7f\u7528\u3002\n\n"
+            "  [\u751f\u6210\u3068\u8ee2\u5199]\n"
+            "  1. \u30e2\u30fc\u30c9\u3092\u8a2d\u5b9a\u3057\u3001[\u30b1\u30fc\u30b8\u751f\u6210]\u3092\u30af\u30ea\u30c3\u30af\u3002\n"
+            "     -> \u30d7\u30ec\u30d3\u30e5\u30fc\u7528\u30b1\u30fc\u30b8\u30e1\u30c3\u30b7\u30e5\u304c\u751f\u6210\u3002\n"
+            "     -> \u300c\u751f\u6210\u6e08\u307f\u30b1\u30fc\u30b8\u300d\u30ea\u30b9\u30c8\u306b\u8868\u793a\u3002\n"
+            "  2. \u30ea\u30b9\u30c8\u306e\u30b1\u30fc\u30b8\u3092\u30af\u30ea\u30c3\u30af\u3067\u30b7\u30fc\u30f3\u5185\u9078\u629e\u3002\n"
+            "  3. [\u9069\u7528(\u8ee2\u5199)]\u3092\u30af\u30ea\u30c3\u30af\u3002\n"
+            "     -> \u30bf\u30fc\u30b2\u30c3\u30c8\u30e1\u30c3\u30b7\u30e5\u306b\u30a6\u30a7\u30a4\u30c8\u304c\n"
+            "        \u76f4\u63a5\u66f8\u304d\u8fbc\u307e\u308c\u307e\u3059\u3002\n"
+            "        \u30ec\u30dd\u30fc\u30c8\u30a6\u30a3\u30f3\u30c9\u30a6\u3067\u7d50\u679c\u3092\u78ba\u8a8d\u3002\n\n"
+            "  [\u30aa\u30d7\u30b7\u30e7\u30f3]\n"
+            "  - \u30aa\u30d5\u30bb\u30c3\u30c8: \u30b1\u30fc\u30b8\u306e\u62e1\u5f35\u91cf (0.0 - 1.0)\u3002\n"
+            "  - \u5206\u5272\u6570 \u5186\u5468: \u65ad\u9762\u306e\u5206\u5272\u6570\u3002\n"
+            "  - \u5206\u5272\u6570 \u9aa8\u3042\u305f\u308a: 1\u30dc\u30fc\u30f3\u3042\u305f\u308a\u306e\u30ea\u30f3\u30b0\u6570\u3002\n"
+            "  - \u8ee2\u5199\u5f8c\u306b\u30b1\u30fc\u30b8\u3092\u81ea\u52d5\u524a\u9664: \u8ee2\u5199\u5f8c\u306b\u30b1\u30fc\u30b8\u3092\u524a\u9664\u3002\n\n"
             "--- \u30c7\u30fc\u30bf\u30c1\u30a7\u30c3\u30af ---\n"
-            "- \u30a6\u30a7\u30a4\u30c8\u7cbe\u5ea6: \u95be\u5024(\u30c7\u30d5\u30a9\u30eb\u30c80.01)\u3088\u308a\u7d30\u304b\u3044\u30a6\u30a7\u30a4\u30c8\u3092\u691c\u51fa\u3002\n"
+            "- \u30a6\u30a7\u30a4\u30c8\u7cbe\u5ea6: \u95be\u5024\u3088\u308a\u7d30\u304b\u3044\u30a6\u30a7\u30a4\u30c8\u3092\u691c\u51fa\u3002\n"
             "- \u540c\u4f4d\u7f6e\u30c1\u30a7\u30c3\u30af: \u540c\u3058\u4f4d\u7f6e\u3067\u30a6\u30a7\u30a4\u30c8\u304c\u7570\u306a\u308b\u9802\u70b9\u3092\u691c\u51fa\u3002\n"
             "- \u30b9\u30ad\u30f3\u30b8\u30e7\u30a4\u30f3\u30c8\u30bb\u30c3\u30c8\u4f5c\u6210\u3002\n\n"
             "--- \u30d2\u30f3\u30c8 ---\n"
@@ -1131,24 +1198,70 @@ def _jnt_depth(j):
     return d
 
 
-# --- [450] cage_gen ---
+# --- [450] cage_gen --- # v5 2026-03-23
 # ============================================================================
-# Cage Mesh Generation
+# Cage Mesh Generation (v4 — bone-tube, segment-filtered radius)
 # ============================================================================
-# Auto-generate a cage mesh around a target mesh, aligned to a bone chain.
-# Depends on: 000 (cmds, om), 100 (get_shape, get_skin_cluster)
+# Generate cage tube meshes from bone positions, one per branch.
+# Radius is computed only from vertices near each bone segment's axis.
+# Depends on: 000 (cmds, om, math), 100 (get_shape, get_skin_cluster)
+
+
+# ---- Bone tree traversal ----
+
+def _get_bone_tree(root_joint):
+    """Recursively build a tree dict from root_joint downward."""
+    pos = cmds.xform(root_joint, q=True, ws=True, t=True)
+    children_joints = cmds.listRelatives(
+        root_joint, children=True, type="joint", fullPath=True
+    ) or []
+    children = []
+    for c in children_joints:
+        children.append(_get_bone_tree(c))
+    return {
+        "joint": root_joint,
+        "pos": (pos[0], pos[1], pos[2]),
+        "children": children,
+    }
+
+
+def _extract_branches(tree_node, current_chain=None):
+    """Extract per-branch joint chains. Each branch starts at the last
+    branching point and goes to the leaf."""
+    if current_chain is None:
+        current_chain = []
+    current_chain = current_chain + [tree_node["joint"]]
+
+    if not tree_node["children"]:
+        return [current_chain]
+
+    if len(tree_node["children"]) == 1:
+        return _extract_branches(tree_node["children"][0], current_chain)
+
+    branches = []
+    for child in tree_node["children"]:
+        child_branches = _extract_branches(child, [tree_node["joint"]])
+        branches.extend(child_branches)
+    return branches
+
+
+def _flatten_tree(tree_node):
+    """Return a flat list of all joint names in the tree."""
+    result = [tree_node["joint"]]
+    for child in tree_node["children"]:
+        result.extend(_flatten_tree(child))
+    return result
+
 
 def _get_bone_chain_ordered(root_joint):
-    """Walk from root_joint downward, returning an ordered list of joints.
-    Follows the longest child chain at each branch.
-    """
+    """Walk from root_joint downward, following the longest child chain.
+    Kept for backward compatibility with Body Fit."""
     chain = [root_joint]
     current = root_joint
     while True:
         children = cmds.listRelatives(current, children=True, type="joint", fullPath=True) or []
         if not children:
             break
-        # Pick the child with the longest descendant chain
         best = children[0]
         best_depth = 0
         for c in children:
@@ -1161,6 +1274,8 @@ def _get_bone_chain_ordered(root_joint):
     return chain
 
 
+# ---- Bone positions ----
+
 def _get_bone_positions_world(joints):
     """Get world-space positions of joints as list of (x,y,z) tuples."""
     positions = []
@@ -1170,109 +1285,156 @@ def _get_bone_positions_world(joints):
     return positions
 
 
-def _compute_cage_bbox(mesh, joints, offset=0.05):
-    """Compute bounding radius per bone segment by sampling mesh vertices.
-    Returns a list of radii, one per joint position.
+# ---- Radius computation (segment-filtered) ----
+
+def _compute_bone_radii(mesh, joints, offset=0.05):
+    """Compute per-bone radius by projecting nearby vertices onto each
+    bone segment and measuring the perpendicular distance.
+
+    Only vertices whose projection falls within the segment range (plus
+    a small margin) are considered. This prevents distant mesh parts
+    from inflating the radius.
     """
+    num_bones = len(joints)
+    bone_pos = _get_bone_positions_world(joints)
+
+    # Compute segment vectors and lengths
+    seg_lens = []
+    for i in range(num_bones - 1):
+        dx = bone_pos[i + 1][0] - bone_pos[i][0]
+        dy = bone_pos[i + 1][1] - bone_pos[i][1]
+        dz = bone_pos[i + 1][2] - bone_pos[i][2]
+        seg_lens.append(math.sqrt(dx * dx + dy * dy + dz * dz))
+
+    # Fallback radius from segment length
+    fallback = []
+    for i in range(num_bones):
+        lens = []
+        if i > 0 and seg_lens[i - 1] > 0.001:
+            lens.append(seg_lens[i - 1])
+        if i < len(seg_lens) and seg_lens[i] > 0.001:
+            lens.append(seg_lens[i])
+        mn = min(lens) if lens else 1.0
+        fallback.append(max(mn * 0.2, 0.01))
+
+    if not mesh:
+        return [r * (1.0 + offset) for r in fallback]
+
     shape = get_shape(mesh)
     if not shape:
-        return [1.0] * len(joints)
+        return [r * (1.0 + offset) for r in fallback]
 
     vc = cmds.polyEvaluate(shape, vertex=True)
-    bone_pos = _get_bone_positions_world(joints)
-    num_bones = len(bone_pos)
+    if vc == 0:
+        return [r * (1.0 + offset) for r in fallback]
 
-    # Get all vertex positions
-    positions = _bulk_get_positions(shape, vc)
-    if not positions:
-        # Fallback: use cmds
-        positions = []
-        for i in range(vc):
-            p = cmds.pointPosition("{0}.vtx[{1}]".format(shape, i), w=True)
-            positions.append((p[0], p[1], p[2]))
-
-    # Compute bone axis (direction from first to last bone)
-    axis = [bone_pos[-1][k] - bone_pos[0][k] for k in range(3)]
-    axis_len = math.sqrt(sum(a * a for a in axis))
-    if axis_len < 0.0001:
-        return [1.0] * num_bones
-    axis = [a / axis_len for a in axis]
-
-    # For each joint, find max perpendicular distance of nearby vertices
+    # For each vertex, project onto every segment and record perpendicular
+    # distance only if the projection falls within the segment bounds.
     radii = [0.0] * num_bones
+    count = [0] * num_bones
 
-    for vx, vy, vz in positions:
-        # Project vertex onto bone axis to find nearest joint
-        dx = vx - bone_pos[0][0]
-        dy = vy - bone_pos[0][1]
-        dz = vz - bone_pos[0][2]
-        proj = dx * axis[0] + dy * axis[1] + dz * axis[2]
+    step = max(1, vc // 3000)
+    for vi in range(0, vc, step):
+        p = cmds.pointPosition("{0}.vtx[{1}]".format(shape, vi), w=True)
+        vx, vy, vz = p[0], p[1], p[2]
 
-        # Find which bone segment this vertex belongs to
-        best_bone = 0
-        best_dist = float("inf")
-        for b in range(num_bones):
-            bx, by, bz = bone_pos[b]
-            d = math.sqrt((vx - bx) ** 2 + (vy - by) ** 2 + (vz - bz) ** 2)
-            if d < best_dist:
-                best_dist = d
-                best_bone = b
+        for si in range(num_bones - 1):
+            slen = seg_lens[si]
+            if slen < 0.0001:
+                continue
 
-        # Perpendicular distance from vertex to bone axis
-        bx, by, bz = bone_pos[best_bone]
-        dx2 = vx - bx
-        dy2 = vy - by
-        dz2 = vz - bz
-        dot = dx2 * axis[0] + dy2 * axis[1] + dz2 * axis[2]
-        perp_sq = dx2 * dx2 + dy2 * dy2 + dz2 * dz2 - dot * dot
-        perp = math.sqrt(max(0.0, perp_sq))
+            # Segment direction
+            ax = (bone_pos[si + 1][0] - bone_pos[si][0]) / slen
+            ay = (bone_pos[si + 1][1] - bone_pos[si][1]) / slen
+            az = (bone_pos[si + 1][2] - bone_pos[si][2]) / slen
 
-        if perp > radii[best_bone]:
-            radii[best_bone] = perp
+            # Vector from segment start to vertex
+            dx = vx - bone_pos[si][0]
+            dy = vy - bone_pos[si][1]
+            dz = vz - bone_pos[si][2]
 
-    # Apply offset and ensure minimum radius
-    min_radius = 0.01
+            # Project onto segment axis
+            proj = dx * ax + dy * ay + dz * az
+
+            # Only consider vertices within segment range (with 20% margin)
+            margin = slen * 0.2
+            if proj < -margin or proj > slen + margin:
+                continue
+
+            # Perpendicular distance
+            perp_sq = dx * dx + dy * dy + dz * dz - proj * proj
+            perp = math.sqrt(max(0.0, perp_sq))
+
+            # Assign to the closer bone endpoint
+            if proj < slen * 0.5:
+                bi = si
+            else:
+                bi = si + 1
+
+            if perp > radii[bi]:
+                radii[bi] = perp
+            count[bi] += 1
+
+    # Apply offset and fallback
+    avg_seg = sum(seg_lens) / len(seg_lens) if seg_lens else 1.0
+    max_cap = avg_seg * 1.2
+
     for i in range(num_bones):
-        radii[i] = max(radii[i] * (1.0 + offset), min_radius)
+        if radii[i] < 0.001 or count[i] == 0:
+            radii[i] = fallback[i]
+        radii[i] = radii[i] * (1.0 + offset)
+        radii[i] = min(radii[i], max_cap)
+        radii[i] = max(radii[i], 0.01)
 
     return radii
 
 
-def generate_cage_mesh(mesh, root_joint, subdivisions=8, offset=0.05):
-    """Generate a cage mesh around the target mesh, aligned to the bone chain.
+# ---- Tube mesh builder (rotation minimizing frames) ----
 
-    Args:
-        mesh: target mesh transform node
-        root_joint: root joint of the bone chain
-        subdivisions: number of rings along the cage length
-        offset: expansion factor beyond mesh bounding radius
+def _vec_normalize(x, y, z):
+    ln = math.sqrt(x * x + y * y + z * z)
+    if ln < 0.00001:
+        return (0.0, 0.0, 0.0)
+    return (x / ln, y / ln, z / ln)
 
-    Returns:
-        (cage_transform, cage_joints) where cage_transform is the new mesh name
-        and cage_joints is the ordered joint chain, or (None, None) on failure.
+def _vec_cross(ax, ay, az, bx, by, bz):
+    return (ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx)
+
+def _vec_dot(ax, ay, az, bx, by, bz):
+    return ax * bx + ay * by + az * bz
+
+def _initial_frame(tx, ty, tz):
+    """Compute initial perpendicular frame for tangent, picking the
+    world axis least aligned with the tangent."""
+    ax = abs(tx); ay = abs(ty); az = abs(tz)
+    if ax <= ay and ax <= az:
+        up = (1.0, 0.0, 0.0)
+    elif ay <= az:
+        up = (0.0, 1.0, 0.0)
+    else:
+        up = (0.0, 0.0, 1.0)
+    rx, ry, rz = _vec_cross(tx, ty, tz, up[0], up[1], up[2])
+    rx, ry, rz = _vec_normalize(rx, ry, rz)
+    fx, fy, fz = _vec_cross(rx, ry, rz, tx, ty, tz)
+    fx, fy, fz = _vec_normalize(fx, fy, fz)
+    return (rx, ry, rz, fx, fy, fz)
+
+
+def _build_tube_mesh(bone_pos, radii, subdivisions_per_seg=4, sides=8):
+    """Build cage tube (v10 — per-ring independent frame).
+    Each ring computes its own frame from tangent + world up.
+    No frame propagation = no twist accumulation.
+    subdivisions_per_seg: rings per bone segment.
     """
-    # Get ordered bone chain
-    joints = _get_bone_chain_ordered(root_joint)
-    if len(joints) < 2:
-        cmds.warning("Need at least 2 joints in the chain.")
-        return (None, None)
+    num_bones = len(bone_pos)
+    num_segments = max(num_bones - 1, 1)
+    num_rings = max(subdivisions_per_seg * num_segments, 2)
 
-    bone_pos = _get_bone_positions_world(joints)
-    num_bones = len(joints)
-
-    # Compute per-bone radii from mesh bounding box
-    radii = _compute_cage_bbox(mesh, joints, offset)
-
-    # Number of rings = subdivisions + 1 (top and bottom caps)
-    num_rings = max(subdivisions, 2)
-    sides = 8  # circumference segments
-
-    # Build cage vertices
-    cage_verts = []
+    # Pre-compute ring centers and radii
+    centers = []
+    ring_radii = []
     for ring in range(num_rings + 1):
-        t = float(ring) / num_rings  # 0.0 to 1.0
-
-        # Interpolate position along bone chain
+        t = float(ring) / num_rings
         seg_f = t * (num_bones - 1)
         seg_i = int(seg_f)
         if seg_i >= num_bones - 1:
@@ -1282,50 +1444,61 @@ def generate_cage_mesh(mesh, root_joint, subdivisions=8, offset=0.05):
         cx = bone_pos[seg_i][0] + (bone_pos[seg_i + 1][0] - bone_pos[seg_i][0]) * frac
         cy = bone_pos[seg_i][1] + (bone_pos[seg_i + 1][1] - bone_pos[seg_i][1]) * frac
         cz = bone_pos[seg_i][2] + (bone_pos[seg_i + 1][2] - bone_pos[seg_i][2]) * frac
-
-        # Interpolate radius
         r = radii[seg_i] + (radii[min(seg_i + 1, num_bones - 1)] - radii[seg_i]) * frac
+        centers.append((cx, cy, cz))
+        ring_radii.append(r)
 
-        # Compute local frame (tangent along bone chain)
-        if seg_i < num_bones - 1:
-            tx = bone_pos[seg_i + 1][0] - bone_pos[seg_i][0]
-            ty = bone_pos[seg_i + 1][1] - bone_pos[seg_i][1]
-            tz = bone_pos[seg_i + 1][2] - bone_pos[seg_i][2]
+    # Compute smooth tangents from neighboring centers
+    tangents = []
+    for ri in range(len(centers)):
+        if ri == 0:
+            dx = centers[1][0] - centers[0][0]
+            dy = centers[1][1] - centers[0][1]
+            dz = centers[1][2] - centers[0][2]
+        elif ri == len(centers) - 1:
+            dx = centers[ri][0] - centers[ri - 1][0]
+            dy = centers[ri][1] - centers[ri - 1][1]
+            dz = centers[ri][2] - centers[ri - 1][2]
         else:
-            tx = bone_pos[seg_i][0] - bone_pos[seg_i - 1][0]
-            ty = bone_pos[seg_i][1] - bone_pos[seg_i - 1][1]
-            tz = bone_pos[seg_i][2] - bone_pos[seg_i - 1][2]
-
-        tlen = math.sqrt(tx * tx + ty * ty + tz * tz)
-        if tlen < 0.0001:
+            dx = centers[ri + 1][0] - centers[ri - 1][0]
+            dy = centers[ri + 1][1] - centers[ri - 1][1]
+            dz = centers[ri + 1][2] - centers[ri - 1][2]
+        tx, ty, tz = _vec_normalize(dx, dy, dz)
+        if tx == 0.0 and ty == 0.0 and tz == 0.0:
             tx, ty, tz = 0.0, 1.0, 0.0
-        else:
-            tx /= tlen; ty /= tlen; tz /= tlen
+        tangents.append((tx, ty, tz))
 
-        # Build perpendicular axes
-        up = (0.0, 0.0, 1.0) if abs(ty) < 0.99 else (1.0, 0.0, 0.0)
+    # Build vertices: each ring gets an independent orthogonal frame
+    cage_verts = []
+    for ri in range(len(centers)):
+        cx, cy, cz = centers[ri]
+        r = ring_radii[ri]
+        tx, ty, tz = tangents[ri]
+
+        # Choose world up axis: pick the one least aligned with tangent
+        atx = abs(tx); aty = abs(ty); atz = abs(tz)
+        if aty <= atx and aty <= atz:
+            upx, upy, upz = 0.0, 1.0, 0.0
+        elif atx <= atz:
+            upx, upy, upz = 1.0, 0.0, 0.0
+        else:
+            upx, upy, upz = 0.0, 0.0, 1.0
+
         # right = tangent x up
-        rx = ty * up[2] - tz * up[1]
-        ry = tz * up[0] - tx * up[2]
-        rz = tx * up[1] - ty * up[0]
-        rlen = math.sqrt(rx * rx + ry * ry + rz * rz)
-        if rlen > 0.0001:
-            rx /= rlen; ry /= rlen; rz /= rlen
-        # front = right x tangent
-        fx = ry * tz - rz * ty
-        fy = rz * tx - rx * tz
-        fz = rx * ty - ry * tx
+        rx, ry, rz = _vec_cross(tx, ty, tz, upx, upy, upz)
+        rx, ry, rz = _vec_normalize(rx, ry, rz)
+        # forward = right x tangent
+        fx, fy, fz = _vec_cross(rx, ry, rz, tx, ty, tz)
+        fx, fy, fz = _vec_normalize(fx, fy, fz)
 
         for s in range(sides):
             angle = 2.0 * math.pi * s / sides
-            ca = math.cos(angle)
-            sa = math.sin(angle)
+            ca = math.cos(angle); sa = math.sin(angle)
             vx = cx + r * (ca * rx + sa * fx)
             vy = cy + r * (ca * ry + sa * fy)
             vz = cz + r * (ca * rz + sa * fz)
             cage_verts.append((vx, vy, vz))
 
-    # Build faces (quad strips between rings)
     cage_faces = []
     for ring in range(num_rings):
         for s in range(sides):
@@ -1336,82 +1509,96 @@ def generate_cage_mesh(mesh, root_joint, subdivisions=8, offset=0.05):
             v3 = (ring + 1) * sides + s
             cage_faces.append((v0, v1, v2, v3))
 
-    # Create the mesh in Maya
-    num_verts = len(cage_verts)
-    num_faces = len(cage_faces)
+    return (cage_verts, cage_faces)
+
+
+def _create_maya_mesh(cage_verts, cage_faces):
+    """Create a Maya polygon mesh from vertex/face data."""
     vert_array = om.MFloatPointArray()
     for vx, vy, vz in cage_verts:
         vert_array.append(om.MFloatPoint(vx, vy, vz))
-
     poly_counts = om.MIntArray()
     poly_connects = om.MIntArray()
     for face in cage_faces:
         poly_counts.append(4)
         for vi in face:
             poly_connects.append(vi)
-
     fn_mesh = om.MFnMesh()
-    new_obj = fn_mesh.create(num_verts, num_faces, vert_array,
-                              poly_counts, poly_connects)
-
-    # Get the transform name
+    new_obj = fn_mesh.create(len(cage_verts), len(cage_faces),
+                              vert_array, poly_counts, poly_connects)
     dag = om.MDagPath()
     om.MDagPath.getAPathTo(new_obj, dag)
-    cage_transform = dag.partialPathName()
+    return dag.partialPathName()
 
-    # Rename
-    cage_name = simple_obj_name(mesh) + "_cage"
+
+# ---- Public API ----
+
+def generate_cage_for_branch(mesh, branch_joints, subdivisions_per_seg=4,
+                              offset=0.05, sides=8):
+    """Generate a cage tube for one branch from bone positions."""
+    if len(branch_joints) < 2:
+        return None
+    bone_pos = _get_bone_positions_world(branch_joints)
+    radii = _compute_bone_radii(mesh, branch_joints, offset)
+    cage_verts, cage_faces = _build_tube_mesh(bone_pos, radii, subdivisions_per_seg, sides)
+    cage_transform = _create_maya_mesh(cage_verts, cage_faces)
+    branch_tip = branch_joints[-1].split("|")[-1]
+    mesh_name = simple_obj_name(mesh) if mesh else "cage"
+    cage_name = "{0}_{1}_cage".format(mesh_name, branch_tip)
     cage_transform = cmds.rename(cage_transform, cage_name)
+    return cage_transform
 
-    return (cage_transform, joints)
 
-
-# --- [460] cage_presets ---
+def generate_cage_mesh(mesh, root_joint, subdivisions_per_seg=4, offset=0.05,
+                        target_branches=None, sides=8):
+    """Generate cage meshes for all (or selected) branches."""
+    tree = _get_bone_tree(root_joint)
+    branches = _extract_branches(tree)
+    if not branches:
+        return []
+    if target_branches is not None:
+        branches = [branches[i] for i in target_branches if i < len(branches)]
+    results = []
+    for branch in branches:
+        if len(branch) < 2:
+            continue
+        cage = generate_cage_for_branch(mesh, branch, subdivisions_per_seg, offset, sides)
+        if cage:
+            results.append((cage, branch))
+    return results
+# --- [460] cage_presets --- # v5 2026-03-23
 # ============================================================================
-# Cage Weight Presets
+# Cage Weight Modes (v5 — simplified to 5 modes)
 # ============================================================================
-# Weight mode definitions, per-bone weight computation, and preset dictionaries.
-# Depends on: 000 (math, cmds)
+# Depends on: 000 (math, cmds), 450 (_flatten_tree)
 
-# Weight modes: defines how weight transitions between adjacent bones
+# 5 modes, each with a clear Japanese/English description.
 CAGE_MODES = {
-    "soft":   {"label_en": "Soft sway",    "label_ja": "\u67d4\u3089\u304b\u63fa\u308c"},
-    "hard":   {"label_en": "Hard sway",    "label_ja": "\u786c\u3044\u63fa\u308c"},
-    "human":  {"label_en": "Human joint",  "label_ja": "\u4eba\u4f53\u95a2\u7bc0"},
-    "figure": {"label_en": "Figure joint", "label_ja": "\u30d5\u30a3\u30ae\u30e5\u30a2\u95a2\u7bc0"},
-    "locked": {"label_en": "Locked",       "label_ja": "\u30ed\u30c3\u30af"},
+    "smooth":  {"label_en": "\u2581\u2583\u2585\u2587 Smooth",    "label_ja": "\u2581\u2583\u2585\u2587 \u306a\u3081\u3089\u304b"},
+    "sharp":   {"label_en": "\u2581\u2581\u2585\u2587 Sharp",     "label_ja": "\u2581\u2581\u2585\u2587 \u304f\u3063\u304d\u308a"},
+    "rigid":   {"label_en": "\u2581\u2581\u2588\u2587 Rigid",     "label_ja": "\u2581\u2581\u2588\u2587 \u786c\u3044\u30bb\u30b0\u30e1\u30f3\u30c8"},
+    "skip":    {"label_en": "\u2500\u2500 Skip",           "label_ja": "\u2500\u2500 \u30b9\u30ad\u30c3\u30d7"},
+    "fixed":   {"label_en": "\u2581\u2581\u2588\u2588 50/50",     "label_ja": "\u2581\u2581\u2588\u2588 50/50"},
 }
 
-CAGE_MODE_ORDER = ["soft", "hard", "human", "figure", "locked"]
+CAGE_MODE_ORDER = ["smooth", "sharp", "rigid", "skip", "fixed"]
 
-# Presets: maps preset name to a list of mode strings.
-# The list length should match (num_bones - 1), one mode per bone segment.
-# If the bone count differs, the preset is repeated or truncated.
-CAGE_PRESETS = {
-    "hair_free":    {"label_en": "Hair (free)",        "label_ja": "\u9aea\uff08\u81ea\u7531\uff09",
-                     "modes": ["soft", "soft", "soft", "soft"]},
-    "hair_tied":    {"label_en": "Hair (tied)",        "label_ja": "\u9aea\uff08\u7d50\u3073\uff09",
-                     "modes": ["soft", "locked", "locked", "soft"]},
-    "cloth":        {"label_en": "Cloth",              "label_ja": "\u5e03",
-                     "modes": ["soft", "soft", "soft", "soft"]},
-    "leather":      {"label_en": "Leather",            "label_ja": "\u9769",
-                     "modes": ["hard", "hard", "hard", "hard"]},
-    "arm_human":    {"label_en": "Arm (human)",        "label_ja": "\u8155\uff08\u4eba\u4f53\uff09",
-                     "modes": ["human", "human", "human", "human"]},
-    "arm_robot":    {"label_en": "Robot arm",          "label_ja": "\u30ed\u30dc\u30c3\u30c8\u8155",
-                     "modes": ["figure", "figure", "figure", "figure"]},
-    "ponytail_rib": {"label_en": "Ponytail+ribbon",   "label_ja": "\u30dd\u30cb\u30c6+\u30ea\u30dc\u30f3",
-                     "modes": ["locked", "soft", "hard", "soft"]},
+# Backward-compat mapping
+_MODE_COMPAT = {
+    "soft": "smooth", "chain_rope": "smooth", "free_hair": "smooth",
+    "cloth_edge": "smooth", "claw_finger": "smooth",
+    "hard": "sharp", "blade_handle": "sharp", "tied_hair": "sharp",
+    "human": "smooth", "joint_limb": "smooth",
+    "figure": "rigid", "figure_joint": "rigid", "robot_arm": "rigid",
+    "locked": "fixed", "lock": "fixed",
 }
 
-CAGE_PRESET_ORDER = [
-    "hair_free", "hair_tied", "cloth", "leather",
-    "arm_human", "arm_robot", "ponytail_rib",
-]
+def _compat_mode(mode_id):
+    return _MODE_COMPAT.get(mode_id, mode_id)
 
 
 def cage_mode_label(mode_id):
-    """Return localised label for a cage mode."""
+    mode_id = _compat_mode(mode_id)
     m = CAGE_MODES.get(mode_id)
     if not m:
         return mode_id
@@ -1419,76 +1606,49 @@ def cage_mode_label(mode_id):
     return m.get(key, mode_id)
 
 
-def cage_preset_label(preset_id):
-    """Return localised label for a cage preset."""
-    p = CAGE_PRESETS.get(preset_id)
-    if not p:
-        return preset_id
-    key = "label_ja" if _LANG == "ja" else "label_en"
-    return p.get(key, preset_id)
+def modes_for_branch(branch_joints, per_bone_modes):
+    """Extract per-segment mode list for a branch."""
+    modes = []
+    for i in range(len(branch_joints) - 1):
+        mode = per_bone_modes.get(branch_joints[i], "fixed")
+        modes.append(_compat_mode(mode))
+    return modes
 
 
-def adapt_preset_modes(preset_id, num_segments):
-    """Adapt a preset's mode list to the actual number of bone segments.
-    num_segments = num_bones - 1.
-    If preset has fewer entries, repeat the last mode.
-    If preset has more entries, truncate.
-    Returns a list of mode strings with length == num_segments.
-    """
-    p = CAGE_PRESETS.get(preset_id)
-    if not p:
-        return ["soft"] * num_segments
-    modes = list(p["modes"])
-    if len(modes) == 0:
-        return ["soft"] * num_segments
-    while len(modes) < num_segments:
-        modes.append(modes[-1])
-    return modes[:num_segments]
-
+# ---- Weight computation ----
 
 def _smoothstep(t):
-    """Hermite smoothstep: 3t^2 - 2t^3"""
     return t * t * (3.0 - 2.0 * t)
 
 
 def compute_segment_weight(mode, frac):
-    """Compute weight blend for a single bone segment.
+    """Compute (parent_weight, child_weight) for a segment position.
 
-    Args:
-        mode: one of the CAGE_MODES keys
-        frac: normalised position within the segment (0.0 = parent bone, 1.0 = child bone)
-
-    Returns:
-        (parent_weight, child_weight) tuple that sums to 1.0
+    Modes:
+      smooth - wide smooth blend (good for cloth, hair, chains)
+      sharp  - tight blend at the midpoint (good for blades, tight joints)
+      rigid  - hard cut with narrow transition zone (robot, figure joints)
+      skip   - same as smooth (cage still generated, but can be unchecked)
+      fixed  - hard 50/50 cut (parent 100% then child 100%)
     """
+    mode = _compat_mode(mode)
     frac = max(0.0, min(1.0, frac))
 
-    if mode == "locked":
-        # Hard cut at midpoint, no blending
-        if frac < 0.5:
-            return (1.0, 0.0)
-        return (0.0, 1.0)
+    if mode == "fixed":
+        return (1.0, 0.0) if frac < 0.5 else (0.0, 1.0)
 
-    if mode == "soft":
-        # Wide gaussian-like blend: smoothstep + linear mix for extra overlap feel
+    if mode in ("smooth", "skip"):
         s = _smoothstep(frac)
-        blend = 0.3
+        blend = 0.25
         w = s * (1.0 - blend) + frac * blend
         return (1.0 - w, w)
 
-    if mode == "hard":
-        # Standard smoothstep, tighter than soft
+    if mode == "sharp":
         s = _smoothstep(frac)
         return (1.0 - s, s)
 
-    if mode == "human":
-        # Smooth joint: standard smoothstep
-        s = _smoothstep(frac)
-        return (1.0 - s, s)
-
-    if mode == "figure":
-        # Rigid segments with narrow joint zone
-        zone = 0.12
+    if mode == "rigid":
+        zone = 0.1
         if frac < 0.5 - zone:
             return (1.0, 0.0)
         if frac > 0.5 + zone:
@@ -1497,54 +1657,39 @@ def compute_segment_weight(mode, frac):
         s = _smoothstep(jt)
         return (1.0 - s, s)
 
-    # Fallback: linear
     return (1.0 - frac, frac)
 
 
 def compute_cage_weights(num_bones, num_verts, modes):
-    """Compute full weight matrix for a cage mesh.
-
-    Args:
-        num_bones: number of bones in the chain
-        num_verts: number of vertices along the cage length
-        modes: list of mode strings, length == num_bones - 1
-
-    Returns:
-        List of lists: weights[vtx_index] = [w_bone0, w_bone1, ..., w_boneN]
-        Each inner list sums to 1.0.
-    """
+    """Compute weight matrix for a cage mesh."""
     num_segments = num_bones - 1
     if num_segments <= 0:
         return [[1.0]] * num_verts
 
-    # Ensure modes list matches segment count
+    modes = [_compat_mode(m) for m in modes]
     while len(modes) < num_segments:
-        modes.append("soft")
+        modes.append("smooth")
     modes = modes[:num_segments]
 
     weights = []
     for v in range(num_verts):
-        t = float(v) / max(num_verts - 1, 1)  # 0.0 to 1.0 along cage
-        seg_f = t * num_segments               # which segment (float)
-        seg_i = int(seg_f)                      # segment index
+        t = float(v) / max(num_verts - 1, 1)
+        seg_f = t * num_segments
+        seg_i = int(seg_f)
         if seg_i >= num_segments:
             seg_i = num_segments - 1
-        frac = seg_f - seg_i                    # position within segment
-
+        frac = seg_f - seg_i
         bw = [0.0] * num_bones
         pw, cw = compute_segment_weight(modes[seg_i], frac)
         bw[seg_i] = pw
         bw[seg_i + 1] = cw
         weights.append(bw)
-
     return weights
-
-
 # --- [470] cage_weights ---
 # ============================================================================
-# Cage Weight Application
+# Cage Weight Application (v3)
 # ============================================================================
-# Bind cage mesh to bones and apply algorithmic weights based on mode presets.
+# Bind cage mesh to bones and apply algorithmic weights based on mode settings.
 # Depends on: 000 (cmds, om, oma), 100 (get_shape, get_skin_cluster),
 #             210 (OpenMaya helpers), 450 (cage_gen), 460 (cage_presets)
 
@@ -1553,15 +1698,14 @@ def _bind_cage(cage_transform, joints):
     Returns the skinCluster name or None on failure.
     """
     try:
-        # Select joints + cage
         sel_list = list(joints) + [cage_transform]
         cmds.select(sel_list, r=True)
         sc = cmds.skinCluster(
             joints, cage_transform,
             toSelectedBones=True,
-            bindMethod=0,           # closest distance
-            normalizeWeights=1,     # interactive
-            weightDistribution=0,   # distance
+            bindMethod=0,
+            normalizeWeights=1,
+            weightDistribution=0,
             maximumInfluences=2,
             obeyMaxInfluences=True,
             removeUnusedInfluence=False,
@@ -1575,38 +1719,27 @@ def _bind_cage(cage_transform, joints):
 
 
 def _set_weights_api(sc_name, shape_name, joints, weights_matrix):
-    """Set skin weights on cage mesh using OpenMaya API for speed.
-
-    Args:
-        sc_name: skinCluster node name
-        shape_name: mesh shape node name
-        joints: ordered list of joint names
-        weights_matrix: list of lists, weights_matrix[vtx] = [w0, w1, ...]
-    """
+    """Set skin weights on cage mesh using OpenMaya API for speed."""
     fn = _get_skin_fn(sc_name)
     dp = _get_dag_path(shape_name)
 
     num_verts = len(weights_matrix)
     num_inf = len(joints)
 
-    # Get influence indices
     inf_indices = om.MIntArray()
     for i in range(num_inf):
         inf_indices.append(i)
 
-    # Build vertex component
     fn_comp = om.MFnSingleIndexedComponent()
     comp = fn_comp.create(om.MFn.kMeshVertComponent)
     for i in range(num_verts):
         fn_comp.addElement(i)
 
-    # Build flat weight array
     weight_array = om.MDoubleArray()
     for vtx_weights in weights_matrix:
         for w in vtx_weights:
             weight_array.append(w)
 
-    # Set weights
     fn.setWeights(dp, comp, inf_indices, weight_array, False)
 
 
@@ -1628,7 +1761,7 @@ def apply_cage_weights(cage_transform, joints, modes):
 
     Args:
         cage_transform: cage mesh transform name
-        joints: ordered list of joint names
+        joints: ordered list of joint names (one branch)
         modes: list of mode strings, length == len(joints) - 1
 
     Returns:
@@ -1646,15 +1779,12 @@ def apply_cage_weights(cage_transform, joints, modes):
 
     vc = cmds.polyEvaluate(shape, vertex=True)
 
-    # Bind skin
     sc = _bind_cage(cage_transform, joints)
     if not sc:
         return None
 
-    # Compute weights
     weights_matrix = compute_cage_weights(num_bones, vc, modes)
 
-    # Apply weights via API (fast)
     try:
         _set_weights_api(sc, shape, joints, weights_matrix)
     except Exception as e:
@@ -1664,141 +1794,303 @@ def apply_cage_weights(cage_transform, joints, modes):
     return sc
 
 
-# --- [480] cage_transfer ---
-# ============================================================================
-# Cage Weight Transfer
-# ============================================================================
-# Transfer weights from cage mesh to the target mesh, with cleanup.
-# Depends on: 000 (cmds), 100 (get_shape, get_skin_cluster)
-
-def transfer_cage_weights(cage_transform, target_mesh, delete_cage=True):
-    """Transfer skin weights from cage mesh to target mesh.
-
-    Uses Maya's copySkinWeights for robust spatial matching.
+def apply_cage_weights_tree(cage_transform, branch_joints, per_bone_modes):
+    """Bind and weight a cage mesh using per-bone mode dict.
 
     Args:
-        cage_transform: cage mesh with applied weights
-        target_mesh: destination mesh transform
-        delete_cage: if True, delete cage and its skinCluster after transfer
+        cage_transform: cage mesh transform name
+        branch_joints: ordered joint list for this branch
+        per_bone_modes: dict {joint_path: mode_id}
 
     Returns:
-        True on success, False on failure.
+        skinCluster name or None on failure.
     """
-    # Validate cage
-    cage_shape = get_shape(cage_transform)
-    cage_sc = get_skin_cluster(cage_shape) if cage_shape else ""
-    if not cage_sc:
-        cmds.warning("Cage mesh has no skinCluster: {0}".format(cage_transform))
-        return False
+    seg_modes = modes_for_branch(branch_joints, per_bone_modes)
+    return apply_cage_weights(cage_transform, branch_joints, seg_modes)
+# --- [480] cage_transfer --- # v8 2026-03-23
+# ============================================================================
+# Cage Weight Transfer (v8 — skip mode respected, rigid weapon support)
+# ============================================================================
+# v8 changes:
+#   - "skip" mode segments: vertices projecting to these are left untouched
+#   - Vertices only get new weights if their nearest segment is non-skip
+#   - This lets weapon/rigid parts keep their original weights
+# Depends on: 000 (cmds, om, oma, math), 040 (Report),
+#             100 (get_shape, get_skin_cluster, simple_obj_name),
+#             210 (_get_skin_fn, _get_dag_path, _bulk_get_weights,
+#                   _bulk_get_positions),
+#             450 (_get_bone_positions_world),
+#             460 (compute_segment_weight, modes_for_branch, _compat_mode)
 
-    # Get joints from cage
-    cage_joints = cmds.listConnections(cage_sc + ".matrix", type="joint") or []
-    if not cage_joints:
-        cmds.warning("No joints found on cage skinCluster.")
-        return False
 
-    # Validate target
+def _project_vertex_to_chain(vx, vy, vz, bone_pos, seg_lens):
+    """Project a vertex onto a bone chain.
+    Returns (best_segment_index, frac_within_segment, distance).
+    """
+    best_seg = -1
+    best_frac = 0.0
+    best_dist = float('inf')
+
+    for si in range(len(seg_lens)):
+        slen = seg_lens[si]
+        if slen < 0.0001:
+            continue
+
+        ax = (bone_pos[si + 1][0] - bone_pos[si][0]) / slen
+        ay = (bone_pos[si + 1][1] - bone_pos[si][1]) / slen
+        az = (bone_pos[si + 1][2] - bone_pos[si][2]) / slen
+
+        dx = vx - bone_pos[si][0]
+        dy = vy - bone_pos[si][1]
+        dz = vz - bone_pos[si][2]
+
+        proj = dx * ax + dy * ay + dz * az
+        proj_clamped = max(0.0, min(slen, proj))
+        frac = proj_clamped / slen
+
+        cpx = bone_pos[si][0] + proj_clamped * ax
+        cpy = bone_pos[si][1] + proj_clamped * ay
+        cpz = bone_pos[si][2] + proj_clamped * az
+        dist = math.sqrt((vx - cpx) ** 2 + (vy - cpy) ** 2 + (vz - cpz) ** 2)
+
+        if dist < best_dist:
+            best_dist = dist
+            best_seg = si
+            best_frac = frac
+
+    return (best_seg, best_frac, best_dist)
+
+
+def direct_transfer_weights(target_mesh, branch_joints, per_bone_modes):
+    """Directly write weights to target mesh by projecting vertices onto bones.
+
+    Vertices whose nearest segment has mode "skip" are left untouched.
+    This preserves original weights on rigid/weapon parts.
+
+    Returns (num_affected, num_skipped).
+    """
+    num_bones = len(branch_joints)
+    if num_bones < 2:
+        return (0, 0)
+
+    bone_pos = _get_bone_positions_world(branch_joints)
+
+    seg_lens = []
+    for i in range(num_bones - 1):
+        dx = bone_pos[i + 1][0] - bone_pos[i][0]
+        dy = bone_pos[i + 1][1] - bone_pos[i][1]
+        dz = bone_pos[i + 1][2] - bone_pos[i][2]
+        seg_lens.append(math.sqrt(dx * dx + dy * dy + dz * dz))
+
+    seg_modes = modes_for_branch(branch_joints, per_bone_modes)
+
+    # Check if ALL segments are skip — nothing to do
+    non_skip = [m for m in seg_modes if m != "skip"]
+    if not non_skip:
+        return (0, 0)
+
     target_shape = get_shape(target_mesh)
     if not target_shape:
-        cmds.warning("Cannot find shape for target: {0}".format(target_mesh))
-        return False
+        cmds.warning("No shape: {0}".format(target_mesh))
+        return (0, 0)
 
-    # Ensure target has a skinCluster; if not, bind it
     target_sc = get_skin_cluster(target_shape)
     if not target_sc:
-        try:
-            cmds.select(cage_joints + [target_mesh], r=True)
-            result = cmds.skinCluster(
-                cage_joints, target_mesh,
-                toSelectedBones=True,
-                bindMethod=0,
-                normalizeWeights=1,
-                weightDistribution=0,
-                maximumInfluences=4,
-                obeyMaxInfluences=True,
-                removeUnusedInfluence=False,
-            )
-            target_sc = result[0] if isinstance(result, list) else result
-        except Exception as e:
-            cmds.warning("Failed to bind target mesh: {0}".format(e))
-            return False
+        cmds.warning("No skinCluster: {0}".format(target_mesh))
+        return (0, 0)
 
-    # Copy skin weights: cage -> target
-    try:
-        cmds.copySkinWeights(
-            sourceSkin=cage_sc,
-            destinationSkin=target_sc,
-            noMirror=True,
-            surfaceAssociation="closestPoint",
-            influenceAssociation=["name", "closestJoint", "oneToOne"],
-            normalize=True,
-        )
-    except Exception as e:
-        cmds.warning("copySkinWeights failed: {0}".format(e))
-        return False
+    # Ensure all branch joints are influences
+    existing_inf = set(cmds.skinCluster(target_sc, q=True, inf=True) or [])
+    for bj in branch_joints:
+        short = bj.split("|")[-1]
+        if short not in existing_inf:
+            try:
+                cmds.skinCluster(target_sc, e=True, addInfluence=bj,
+                                  weight=0.0, lockWeights=False)
+            except Exception:
+                pass
 
-    # Cleanup
-    if delete_cage:
-        try:
-            cmds.delete(cage_transform)
-        except Exception:
-            pass
+    all_infs = cmds.skinCluster(target_sc, q=True, inf=True) or []
+    num_inf = len(all_infs)
+    inf_index = {}
+    for i, name in enumerate(all_infs):
+        inf_index[name] = i
 
-    return True
+    branch_inf_indices = []
+    branch_inf_set = set()
+    for bj in branch_joints:
+        short = bj.split("|")[-1]
+        idx = inf_index.get(short, -1)
+        branch_inf_indices.append(idx)
+        if idx >= 0:
+            branch_inf_set.add(idx)
 
+    # Get vertex positions
+    vc = cmds.polyEvaluate(target_shape, vertex=True)
+    positions = _bulk_get_positions(target_shape, vc)
+    if not positions:
+        positions = []
+        for vi in range(vc):
+            p = cmds.pointPosition("{0}.vtx[{1}]".format(target_shape, vi), w=True)
+            positions.append((p[0], p[1], p[2]))
 
-def cage_weight_full(mesh, root_joint, preset_id=None, modes=None,
-                     subdivisions=8, offset=0.05, delete_cage=True):
-    """Full pipeline: generate cage -> apply weights -> transfer -> cleanup.
-
-    Args:
-        mesh: target mesh transform
-        root_joint: root of bone chain
-        preset_id: preset name (e.g. "hair_free"). Ignored if modes is given.
-        modes: explicit list of mode strings per segment. Overrides preset_id.
-        subdivisions: cage ring count
-        offset: cage expansion factor
-        delete_cage: delete cage after transfer
-
-    Returns:
-        True on success, False on failure.
-    """
-    # Generate cage
-    cage_transform, joints = generate_cage_mesh(mesh, root_joint,
-                                                 subdivisions=subdivisions,
-                                                 offset=offset)
-    if not cage_transform:
-        return False
-
-    num_segments = len(joints) - 1
-
-    # Determine modes
-    if modes is None:
-        if preset_id is None:
-            preset_id = "hair_free"
-        modes = adapt_preset_modes(preset_id, num_segments)
+    # Read current weights
+    bulk_w = _bulk_get_weights(target_sc, target_shape, vc, num_inf)
+    if bulk_w:
+        weight_buf = [list(vw) for vw in bulk_w]
     else:
-        # Adapt length
-        while len(modes) < num_segments:
-            modes.append("soft")
-        modes = modes[:num_segments]
+        weight_buf = [[0.0] * num_inf for _ in range(vc)]
 
-    # Apply preset weights to cage
-    sc = apply_cage_weights(cage_transform, joints, modes)
-    if not sc:
-        cmds.warning("Failed to apply weights to cage.")
+    # Disable normalize during batch write
+    orig_normalize = cmds.getAttr(target_sc + ".normalizeWeights")
+    cmds.setAttr(target_sc + ".normalizeWeights", 0)
+
+    affected = 0
+    skipped = 0
+    affected_indices = []
+
+    for vi in range(vc):
+        vx, vy, vz = positions[vi]
+        seg_i, frac, dist = _project_vertex_to_chain(vx, vy, vz,
+                                                       bone_pos, seg_lens)
+        if seg_i < 0:
+            skipped += 1
+            continue
+
+        # --- v8: skip mode check ---
+        # If the nearest segment is "skip", leave this vertex untouched
+        if seg_modes[seg_i] == "skip":
+            skipped += 1
+            continue
+
+        parent_ii = branch_inf_indices[seg_i]
+        child_ii = branch_inf_indices[seg_i + 1]
+
+        if parent_ii < 0 or child_ii < 0:
+            skipped += 1
+            continue
+
+        pw, cw = compute_segment_weight(seg_modes[seg_i], frac)
+
+        # Zero out branch weights
+        for bii in branch_inf_set:
+            weight_buf[vi][bii] = 0.0
+
+        # Set new weights
+        weight_buf[vi][parent_ii] = pw
+        weight_buf[vi][child_ii] = cw
+
+        # Renormalize non-branch weights
+        branch_total = pw + cw
+        non_branch_total = 0.0
+        for k in range(num_inf):
+            if k not in branch_inf_set:
+                non_branch_total += weight_buf[vi][k]
+
+        total = branch_total + non_branch_total
+        if total > 0.0001 and abs(total - 1.0) > 0.0001:
+            if non_branch_total > 0.0001:
+                scale = (1.0 - branch_total) / non_branch_total
+            else:
+                scale = 0.0
+            for k in range(num_inf):
+                if k not in branch_inf_set:
+                    weight_buf[vi][k] *= scale
+
+        affected += 1
+        affected_indices.append(vi)
+
+    # Bulk write via OpenMaya
+    write_ok = False
+    if affected_indices:
         try:
-            cmds.delete(cage_transform)
-        except Exception:
-            pass
-        return False
+            fn = _get_skin_fn(target_sc)
+            dp = _get_dag_path(target_shape)
 
-    # Transfer to target
-    success = transfer_cage_weights(cage_transform, mesh,
-                                     delete_cage=delete_cage)
-    return success
+            fn_comp = om.MFnSingleIndexedComponent()
+            comp = fn_comp.create(om.MFn.kMeshVertComponent)
+            for vi in affected_indices:
+                fn_comp.addElement(vi)
+
+            inf_arr = om.MIntArray(num_inf, 0)
+            for i in range(num_inf):
+                inf_arr[i] = i
+
+            w_arr = om.MDoubleArray(len(affected_indices) * num_inf, 0.0)
+            for ai, vi in enumerate(affected_indices):
+                for j in range(num_inf):
+                    w_arr[ai * num_inf + j] = weight_buf[vi][j]
+
+            fn.setWeights(dp, comp, inf_arr, w_arr, False)
+            write_ok = True
+        except Exception as e:
+            print("[CageTransfer] API write failed: {0}".format(e))
+
+    # Fallback
+    if not write_ok and affected_indices:
+        print("[CageTransfer] Falling back to cmds.skinPercent...")
+        for vi in affected_indices:
+            tv = []
+            for j in range(num_inf):
+                if weight_buf[vi][j] > 0.0001:
+                    tv.append((all_infs[j], weight_buf[vi][j]))
+            if tv:
+                try:
+                    cmds.skinPercent(target_sc,
+                                      "{0}.vtx[{1}]".format(target_shape, vi),
+                                      r=False, transformValue=tv)
+                except Exception:
+                    pass
+
+    # Restore normalize
+    cmds.setAttr(target_sc + ".normalizeWeights", orig_normalize)
+    if orig_normalize:
+        cmds.skinPercent(target_sc, target_shape, normalize=True)
+
+    return (affected, skipped)
 
 
+def transfer_tracked_cages(tracked_cages, target_mesh, per_bone_modes,
+                            delete_cage=True):
+    """Transfer weights for all tracked branches via direct projection.
+
+    Returns (report, ok_count, fail_count).
+    """
+    rpt = Report("Cage Transfer")
+    rpt.log("Target: {0}".format(target_mesh))
+    rpt.log("Branches: {0}".format(len(tracked_cages)))
+
+    ok_count = 0
+    fail_count = 0
+
+    for cage_name, branch_joints in tracked_cages:
+        tip = branch_joints[-1].split("|")[-1] if branch_joints else "?"
+        rpt.log("")
+        rpt.log("Branch: {0} ({1} joints)".format(tip, len(branch_joints)))
+
+        affected, skipped = direct_transfer_weights(
+            target_mesh, branch_joints, per_bone_modes)
+
+        if affected > 0:
+            ok_count += 1
+            rpt.log("  {0} verts written, {1} skipped".format(affected, skipped))
+        elif skipped > 0:
+            # All vertices skipped (e.g. all-skip branch) is not a failure
+            ok_count += 1
+            rpt.log("  All {0} verts skipped (skip mode)".format(skipped))
+        else:
+            fail_count += 1
+            rpt.error("  0 verts processed")
+
+        if delete_cage and cmds.objExists(cage_name):
+            try:
+                cmds.delete(cage_name)
+            except Exception:
+                pass
+
+    rpt.log("")
+    rpt.log("=== {0} OK, {1} failed ===".format(ok_count, fail_count))
+    return rpt, ok_count, fail_count
 # ============================================================================
 # Data Check Functions
 # ============================================================================
@@ -2007,23 +2299,30 @@ def get_dsw_list():
 
 
 # ============================================================================
-# GUI
+# GUI  # v5 2026-03-20
 # ============================================================================
 
 class DoraSkinWeightUI(object):
     WIN = "DSWPy_Win"
     JNE_WIN = "DSWPy_JNE"
     HTU_WIN = "DSWPy_HTU"
+    CW_BONE_WIN = "DSWPy_CWBone"
 
     def __init__(self):
-        self.import_mode = 1  # default: XYZ
+        self.import_mode = 1
         self._jno=[]; self._jnn=[]
         self._cw_bone_menus=[]
         self._cw_joint_chain=[]
+        self._cw_bone_tree = None
+        self._cw_branches = []
+        self._cw_branch_checks = []
+        self._cw_per_bone_menus_map = {}
+        # v5: tracked cage list [(cage_transform_name, branch_joints), ...]
+        self._cw_generated_cages = []
 
     def show(self):
         if cmds.window(self.WIN,exists=True): cmds.deleteUI(self.WIN)
-        cmds.window(self.WIN, title=tr("win_title").format(VERSION), wh=(360,560), s=True)
+        cmds.window(self.WIN, title=tr("win_title").format(VERSION), wh=(420,560), s=True)
         root=cmds.columnLayout(adj=True)
 
         # === Header ===
@@ -2134,149 +2433,80 @@ class DoraSkinWeightUI(object):
                 (bth,"top",12,btn_rst)])
         cmds.setParent("..")
 
-        # ---- Cage Weight (BETA) ----
+        # ---- Cage Weight — main tab ----
         cwfl=cmds.formLayout()
-        cw_title=cmds.text(label=tr("tab_cage"),al="center",h=24,fn="boldLabelFont")
+        _cw_title_text = "{0} (BETA)".format(tr("tab_cage"))
+        cw_title=cmds.text(label=_cw_title_text,al="center",h=24,fn="boldLabelFont")
 
-        # Target Mesh
         cw_ml=cmds.text(label=tr("cg_target_mesh"),al="left",h=20)
         self.cw_mf=cmds.textField(h=24)
         cw_mb=cmds.button(label=tr("cg_set_sel"),h=24,w=110,c=lambda*a:self._cw_set("mesh"))
 
-        # Root Joint
         cw_jl=cmds.text(label=tr("cg_root_joint"),al="left",h=20)
         self.cw_jf=cmds.textField(h=24)
         cw_jb=cmds.button(label=tr("cg_set_sel"),h=24,w=110,c=lambda*a:self._cw_set("joint"))
 
-        cw_sep1=cmds.separator(h=6,st="in")
+        cw_sep1=cmds.separator(h=8,st="in")
 
-        # Preset buttons
-        cw_pl=cmds.text(label=tr("cg_preset"),al="left",h=20)
-        self.cw_preset_row=cmds.rowLayout(nc=len(CAGE_PRESET_ORDER),adj=1)
-        self._cw_preset_btns=[]
-        for pid in CAGE_PRESET_ORDER:
-            b=cmds.button(label=cage_preset_label(pid),h=24,
-                          c=lambda*a,p=pid:self._cw_apply_preset(p))
-            self._cw_preset_btns.append(b)
-        cmds.setParent("..")
-
-        cw_sep2=cmds.separator(h=6,st="in")
-
-        # Per-bone mode (scrollable list, populated dynamically)
-        cw_bml=cmds.text(label=tr("cg_per_bone"),al="left",h=20)
-        self.cw_bone_col=cmds.columnLayout(adj=True,h=100)
-        self._cw_bone_menus=[]
-        cmds.text(label="  (Set root joint to populate)",al="left",h=20,en=False)
-        cmds.setParent("..")
-
-        cw_sep3=cmds.separator(h=6,st="in")
-
-        # Cage Options
-        cw_ofl=cmds.rowLayout(nc=4,adj=2,cw=[(1,80),(3,80),(4,36)])
-        cmds.text(label=tr("cg_offset"))
-        self.cw_off=cmds.floatField(v=0.05,pre=3,min=0.0,max=1.0,h=22)
-        cmds.text(label=tr("cg_subdivs"))
-        self.cw_sub=cmds.intField(v=8,min=2,max=30,h=22)
-        cmds.setParent("..")
-
-        self.cw_del_cb=cmds.checkBox(label=tr("cg_auto_delete"),v=True,h=20)
-
-        cw_sep4=cmds.separator(h=6,st="in")
-
-        # Action buttons
-        cw_btn_go=cmds.button(label=tr("cg_generate"),h=36,bgc=(0.35,0.55,0.35),
-                              c=lambda*a:self._do_cw_full())
-        cw_btn_pv=cmds.button(label=tr("cg_preview"),h=28,
-                              c=lambda*a:self._do_cw_preview())
+        _open_label = "\u30dc\u30fc\u30f3\u7de8\u96c6\u30fb\u30b1\u30fc\u30b8\u751f\u6210" if _LANG == "ja" else "Bone edit / Cage generation"
+        cw_open_btn=cmds.button(label=_open_label, h=40, bgc=(0.35,0.55,0.35),
+                                c=lambda*a:self._cw_open_bone_editor())
+        self._cw_bone_summary=cmds.text(label="", al="center", h=18,
+                                         fn="smallPlainLabelFont", en=False)
 
         cmds.formLayout(cwfl,e=True,
             af=[(cw_title,"top",8),(cw_title,"left",4),(cw_title,"right",4),
                 (cw_ml,"left",4),(self.cw_mf,"left",4),(cw_mb,"right",4),
                 (cw_jl,"left",4),(self.cw_jf,"left",4),(cw_jb,"right",4),
                 (cw_sep1,"left",4),(cw_sep1,"right",4),
-                (cw_pl,"left",4),(self.cw_preset_row,"left",4),(self.cw_preset_row,"right",4),
-                (cw_sep2,"left",4),(cw_sep2,"right",4),
-                (cw_bml,"left",4),(self.cw_bone_col,"left",4),(self.cw_bone_col,"right",4),
-                (cw_sep3,"left",4),(cw_sep3,"right",4),
-                (cw_ofl,"left",4),(cw_ofl,"right",4),
-                (self.cw_del_cb,"left",8),
-                (cw_sep4,"left",4),(cw_sep4,"right",4),
-                (cw_btn_go,"left",4),(cw_btn_go,"right",4),
-                (cw_btn_pv,"left",4),(cw_btn_pv,"right",4),(cw_btn_pv,"bottom",4)],
+                (cw_open_btn,"left",4),(cw_open_btn,"right",4),
+                (self._cw_bone_summary,"left",4),(self._cw_bone_summary,"right",4)],
             ac=[(cw_ml,"top",8,cw_title),
                 (self.cw_mf,"top",2,cw_ml),(self.cw_mf,"right",4,cw_mb),(cw_mb,"top",2,cw_ml),
                 (cw_jl,"top",12,self.cw_mf),
                 (self.cw_jf,"top",2,cw_jl),(self.cw_jf,"right",4,cw_jb),(cw_jb,"top",2,cw_jl),
                 (cw_sep1,"top",8,self.cw_jf),
-                (cw_pl,"top",4,cw_sep1),(self.cw_preset_row,"top",2,cw_pl),
-                (cw_sep2,"top",4,self.cw_preset_row),
-                (cw_bml,"top",4,cw_sep2),(self.cw_bone_col,"top",2,cw_bml),
-                (cw_sep3,"top",4,self.cw_bone_col),
-                (cw_ofl,"top",4,cw_sep3),
-                (self.cw_del_cb,"top",6,cw_ofl),
-                (cw_sep4,"top",6,self.cw_del_cb),
-                (cw_btn_go,"top",4,cw_sep4),
-                (cw_btn_pv,"top",4,cw_btn_go)])
+                (cw_open_btn,"top",8,cw_sep1),
+                (self._cw_bone_summary,"top",6,cw_open_btn)])
         cmds.setParent("..")
 
         # ---- Data Check ----
         cfl=cmds.formLayout()
-
-        # Section 1: Weight Decimal Check
         dt1=cmds.text(label=tr("decimal_title"),al="left",h=18,fn="boldLabelFont")
         dd1=cmds.text(label=tr("decimal_desc"),al="left",h=16,fn="smallPlainLabelFont")
         ctl=cmds.text(label=tr("digit_unit"),h=20)
         self.ctf=cmds.floatField(v=0.01,pre=4,w=70,h=20)
         b_dig=cmds.button(label=tr("check_digit"),h=22,w=70,c=lambda*a:self._do_chk_dig())
         b_cln=cmds.button(label=tr("clean_digit"),h=22,w=100,bgc=(0.4,0.55,0.7),c=lambda*a:self._do_clean_dig())
-
         sep_c1=cmds.separator(h=10,st="in")
-
-        # Section 2: Influence Count Check
         it1=cmds.text(label=tr("inf_title"),al="left",h=18,fn="boldLabelFont")
         id1=cmds.text(label=tr("inf_desc"),al="left",h=16,fn="smallPlainLabelFont")
         iml=cmds.text(label=tr("inf_max"),h=20)
         self.inf_f=cmds.intField(v=4,min=1,max=20,w=40,h=20)
         b_inf=cmds.button(label=tr("check_inf"),h=22,w=70,c=lambda*a:self._do_chk_inf())
-
         sep_c2=cmds.separator(h=10,st="in")
-
-        # Section 3: Same Position Check
         b_same=cmds.button(label=tr("check_samepos"),h=28,c=lambda*a:check_same_position())
-
         sep_c3=cmds.separator(h=10,st="in")
-
-        # Section 4: Create Joint Set
         b_set=cmds.button(label=tr("create_set"),h=28,c=lambda*a:create_skin_joint_set())
-
         cmds.formLayout(cfl,e=True,
             af=[(dt1,"top",8),(dt1,"left",4),(dt1,"right",4),
                 (dd1,"left",4),(dd1,"right",4),
-                (ctl,"left",4),(self.ctf,"left",4),
-                (b_cln,"right",4),
+                (ctl,"left",4),(self.ctf,"left",4),(b_cln,"right",4),
                 (sep_c1,"left",4),(sep_c1,"right",4),
-                (it1,"left",4),(it1,"right",4),
-                (id1,"left",4),(id1,"right",4),
-                (iml,"left",4),
-                (sep_c2,"left",4),(sep_c2,"right",4),
+                (it1,"left",4),(it1,"right",4),(id1,"left",4),(id1,"right",4),
+                (iml,"left",4),(sep_c2,"left",4),(sep_c2,"right",4),
                 (b_same,"left",4),(b_same,"right",4),
                 (sep_c3,"left",4),(sep_c3,"right",4),
                 (b_set,"left",4),(b_set,"right",4)],
-            ac=[(dd1,"top",2,dt1),
-                (ctl,"top",4,dd1),
+            ac=[(dd1,"top",2,dt1),(ctl,"top",4,dd1),
                 (self.ctf,"top",4,dd1),(self.ctf,"left",6,ctl),
                 (b_dig,"top",4,dd1),(b_dig,"left",6,self.ctf),
                 (b_cln,"top",4,dd1),(b_cln,"left",4,b_dig),
-                (sep_c1,"top",8,ctl),
-                (it1,"top",8,sep_c1),
-                (id1,"top",2,it1),
-                (iml,"top",4,id1),
-                (self.inf_f,"top",4,id1),(self.inf_f,"left",6,iml),
+                (sep_c1,"top",8,ctl),(it1,"top",8,sep_c1),(id1,"top",2,it1),
+                (iml,"top",4,id1),(self.inf_f,"top",4,id1),(self.inf_f,"left",6,iml),
                 (b_inf,"top",4,id1),(b_inf,"left",6,self.inf_f),
-                (sep_c2,"top",8,iml),
-                (b_same,"top",8,sep_c2),
-                (sep_c3,"top",8,b_same),
-                (b_set,"top",8,sep_c3)])
+                (sep_c2,"top",8,iml),(b_same,"top",8,sep_c2),
+                (sep_c3,"top",8,b_same),(b_set,"top",8,sep_c3)])
         cmds.setParent("..")
 
         cmds.tabLayout(self.tabs,e=True,
@@ -2293,15 +2523,19 @@ class DoraSkinWeightUI(object):
         set_language("ja" if v=="\u65e5\u672c\u8a9e" else "en")
         cmds.evalDeferred(self.show)
 
-    # -- How To Use --
     def _htu(self):
         if cmds.window(self.HTU_WIN,exists=True): cmds.deleteUI(self.HTU_WIN)
-        cmds.window(self.HTU_WIN,title=tr("htu_title"),wh=(520,500),s=True)
+        cmds.window(self.HTU_WIN,title=tr("htu_title"),wh=(520,540),s=True)
         cmds.columnLayout(adj=True)
-        cmds.scrollField(text=tr("htu_content",ver=VERSION),ed=False,ww=True,h=460,fn="fixedWidthFont")
+        htu_text = tr("htu_content", ver=VERSION,
+                       smooth="\u2581\u2583\u2585\u2587",
+                       sharp="\u2581\u2581\u2585\u2587",
+                       rigid="\u2581\u2581\u2588\u2587",
+                       fixed="\u2581\u2581\u2588\u2588",
+                       skip="\u2500\u2500")
+        cmds.scrollField(text=htu_text,ed=False,ww=True,h=500,fn="fixedWidthFont")
         cmds.showWindow(self.HTU_WIN)
 
-    # -- Lists --
     def _rl(self,*a):
         items=get_dsw_list()
         cmds.textScrollList(self.il,e=True,ra=True)
@@ -2332,7 +2566,6 @@ class DoraSkinWeightUI(object):
             jm={o:n for o,n in zip(self._jno,self._jnn) if o!=n}
         return jm if jm else None
 
-    # -- Actions --
     def _do_imp(self):
         dn=cmds.textField(self.inf,q=True,tx=True)
         if not dn: show_status(tr("warn_no_dsw"),True); return
@@ -2345,8 +2578,7 @@ class DoraSkinWeightUI(object):
 
     def _do_exp(self, mode):
         n=cmds.textField(self.enf,q=True,tx=True)
-        if not n:
-            show_status(tr("warn_no_name"),True); return
+        if not n: show_status(tr("warn_no_name"),True); return
         dsw_export("{0} {1}".format(mode,n)); self._rl()
 
     def _do_del(self):
@@ -2354,8 +2586,7 @@ class DoraSkinWeightUI(object):
         if not s: show_status(tr("warn_no_dsw"),True); return
         r=cmds.confirmDialog(title="Delete DSW", message=tr("warn_delete_confirm").format(s[0]),
                              button=["OK","Cancel"], defaultButton="Cancel", cancelButton="Cancel")
-        if r=="OK":
-            delete_dsw(s[0]); self._rl()
+        if r=="OK": delete_dsw(s[0]); self._rl()
 
     def _do_vp(self):
         dn=cmds.textField(self.inf,q=True,tx=True)
@@ -2373,7 +2604,10 @@ class DoraSkinWeightUI(object):
     def _do_bf_reset(self):
         body_fit_reset()
 
-    # -- Cage Weight --
+    # ======================================================================
+    # Cage Weight (v5)
+    # ======================================================================
+
     def _cw_set(self, kind):
         sel = cmds.ls(sl=True, long=True)
         if not sel:
@@ -2383,123 +2617,336 @@ class DoraSkinWeightUI(object):
             cmds.textField(self.cw_mf, e=True, tx=simple_obj_name(node))
         elif kind == "joint":
             if cmds.nodeType(node) != "joint":
-                # Try to find joint in selection
                 joints = cmds.ls(sel, type="joint")
                 if joints:
                     node = joints[0]
                 else:
                     show_status("Select a joint.", True); return
             cmds.textField(self.cw_jf, e=True, tx=simple_obj_name(node))
-            self._cw_rebuild_bone_ui(node)
+            self._cw_build_tree(node)
 
-    def _cw_rebuild_bone_ui(self, root_joint):
-        """Rebuild per-bone mode dropdowns from the joint chain."""
-        chain = _get_bone_chain_ordered(root_joint)
-        num_segments = len(chain) - 1
-        if num_segments < 1:
-            return
+    def _cw_build_tree(self, root_joint):
+        """Parse bone tree and update summary."""
+        tree = _get_bone_tree(root_joint)
+        branches = _extract_branches(tree)
+        all_joints = _flatten_tree(tree)
+        self._cw_bone_tree = tree
+        self._cw_branches = branches
+        self._cw_joint_chain = all_joints
+        self._cw_per_bone_menus_map = {}
+        for j in all_joints:
+            self._cw_per_bone_menus_map[j] = "smooth"
+        summary = "{0} joints, {1} branches".format(len(all_joints), len(branches))
+        cmds.text(self._cw_bone_summary, e=True, label=summary, en=True)
+        show_status(summary)
 
-        # Clear existing
-        children = cmds.columnLayout(self.cw_bone_col, q=True, ca=True) or []
-        for c in children:
-            cmds.deleteUI(c)
-
-        self._cw_bone_menus = []
-        self._cw_joint_chain = chain
-
-        cmds.setParent(self.cw_bone_col)
-        for i in range(num_segments):
-            jname = simple_obj_name(chain[i])
-            row = cmds.rowLayout(nc=3, adj=2, cw=[(1,70),(3,120)], h=24)
-            cmds.text(label="  {0}".format(jname), al="left")
-            cmds.text(label="")
-            menu = cmds.optionMenu(h=22)
-            for mid in CAGE_MODE_ORDER:
-                cmds.menuItem(label=cage_mode_label(mid))
-            cmds.setParent("..")
-            self._cw_bone_menus.append(menu)
-        cmds.setParent("..")
-
-    def _cw_get_modes(self):
-        """Read per-bone modes from the UI dropdowns."""
-        modes = []
-        for menu in self._cw_bone_menus:
-            idx = cmds.optionMenu(menu, q=True, sl=True) - 1
-            if 0 <= idx < len(CAGE_MODE_ORDER):
-                modes.append(CAGE_MODE_ORDER[idx])
-            else:
-                modes.append("soft")
-        return modes
-
-    def _cw_apply_preset(self, preset_id):
-        """Apply a preset to all bone mode dropdowns."""
-        num_segs = len(self._cw_bone_menus)
-        if num_segs == 0:
-            show_status(tr("cg_no_joint"), True); return
-        modes = adapt_preset_modes(preset_id, num_segs)
-        for i, menu in enumerate(self._cw_bone_menus):
-            mode = modes[i]
-            idx = CAGE_MODE_ORDER.index(mode) + 1 if mode in CAGE_MODE_ORDER else 1
-            cmds.optionMenu(menu, e=True, sl=idx)
-        show_status("Preset: {0}".format(cage_preset_label(preset_id)))
-
-    def _do_cw_full(self):
-        """Execute full cage weight pipeline."""
+    def _cw_open_bone_editor(self):
+        """Open the unified bone edit + cage generation window."""
         mesh = cmds.textField(self.cw_mf, q=True, tx=True)
         joint = cmds.textField(self.cw_jf, q=True, tx=True)
         if not joint:
-            show_status(tr("cg_no_joint"), True); return
-        if not mesh:
-            show_status(tr("cg_no_mesh"), True); return
-        modes = self._cw_get_modes()
+            show_status("Set root joint first.", True); return
+        if not self._cw_bone_tree:
+            self._cw_build_tree(joint)
+
+        if cmds.window(self.CW_BONE_WIN, exists=True):
+            cmds.deleteUI(self.CW_BONE_WIN)
+
+        _title = "\u30dc\u30fc\u30f3\u7de8\u96c6\u30fb\u30b1\u30fc\u30b8\u751f\u6210" if _LANG == "ja" else "Bone Edit / Cage Generation"
+        cmds.window(self.CW_BONE_WIN, title=_title, wh=(500, 660), s=True)
+        main_col = cmds.columnLayout(adj=True)
+
+        # Header
+        _hint = "\u30dc\u30fc\u30f3\u540d\u30af\u30ea\u30c3\u30af\u3067\u30b7\u30fc\u30f3\u5185\u9078\u629e" if _LANG == "ja" else "Click bone name to select in scene"
+        cmds.text(label=_hint, al="center", h=20, fn="smallPlainLabelFont")
+        cmds.separator(h=4, st="in")
+
+        # Scrollable bone list
+        scroll = cmds.scrollLayout(h=300, cr=True)
+        cmds.columnLayout(adj=True)
+
+        self._cw_bone_editor_menus = {}
+        self._cw_branch_checks = []
+
+        branch_tip_set = set()
+        for br in self._cw_branches:
+            if br:
+                branch_tip_set.add(br[-1])
+
+        def _build_rows(node, depth=0):
+            jname = node["joint"].split("|")[-1]
+            indent = "  " * depth
+            display = indent + jname
+            jpath = node["joint"]
+
+            row = cmds.rowLayout(nc=4, adj=1, h=26, cw=[(2, 140), (3, 28), (4, 28)])
+
+            cmds.button(label=display, al="left", h=24,
+                        c=lambda *a, jp=jpath: self._cw_select_joint(jp))
+
+            menu = cmds.optionMenu(h=22, w=140)
+            for mid in CAGE_MODE_ORDER:
+                cmds.menuItem(label=cage_mode_label(mid))
+            current = self._cw_per_bone_menus_map.get(jpath, "smooth")
+            if current in CAGE_MODE_ORDER:
+                cmds.optionMenu(menu, e=True, sl=CAGE_MODE_ORDER.index(current) + 1)
+            else:
+                cmds.optionMenu(menu, e=True, sl=1)
+
+            if jpath in branch_tip_set:
+                cb = cmds.checkBox(label="", v=True, h=22, w=28)
+                self._cw_branch_checks.append((jpath, cb))
+            else:
+                cmds.text(label="", w=28)
+
+            cmds.text(label="", w=28)
+            cmds.setParent("..")
+
+            self._cw_bone_editor_menus[jpath] = menu
+            for child in node["children"]:
+                _build_rows(child, depth + 1)
+
+        _build_rows(self._cw_bone_tree, 0)
+        cmds.setParent(main_col)
+
+        # --- Generated cage list (v5) ---
+        cmds.separator(h=6, st="in")
+        _cage_list_label = "\u751f\u6210\u6e08\u307f\u30b1\u30fc\u30b8" if _LANG == "ja" else "Generated Cages"
+        cmds.text(label=_cage_list_label, al="left", h=20, fn="boldLabelFont")
+        self._cw_cage_list = cmds.textScrollList(h=70, ams=False,
+                                                   sc=lambda *a: self._cw_cage_list_select())
+        self._cw_refresh_cage_list()
+
+        _del_cage_label = "\u9078\u629e\u30b1\u30fc\u30b8\u3092\u524a\u9664" if _LANG == "ja" else "Delete selected cage"
+        cmds.button(label=_del_cage_label, h=22,
+                    c=lambda *a: self._cw_delete_selected_cage())
+
+        # --- Options ---
+        cmds.separator(h=6, st="in")
+
+        # Offset
+        off_row = cmds.rowLayout(nc=2, adj=2, h=26, cw=[(1, 80)])
+        _off_l = "\u30aa\u30d5\u30bb\u30c3\u30c8" if _LANG == "ja" else "Offset"
+        cmds.text(label=_off_l)
+        self.cw_off = cmds.floatField(v=0.05, pre=3, min=0.0, max=1.0, h=22)
+        cmds.setParent("..")
+
+        # Subdivisions: Axis / per-segment rings
+        sub_row = cmds.rowLayout(nc=6, adj=6, h=26,
+                                  cw=[(1,80),(2,50),(3,50),(4,70),(5,50),(6,10)])
+        _sub_l = "\u5206\u5272\u6570" if _LANG == "ja" else "Subdivs"
+        cmds.text(label=_sub_l)
+        _axis_l = "\u5186\u5468" if _LANG == "ja" else "Axis"
+        cmds.text(label=_axis_l, fn="smallPlainLabelFont")
+        self.cw_sub_axis = cmds.intField(v=8, min=3, max=32, h=22, w=40)
+        _height_l = "\u9aa8\u3042\u305f\u308a" if _LANG == "ja" else "Per bone"
+        cmds.text(label=_height_l, fn="smallPlainLabelFont")
+        self.cw_sub_height = cmds.intField(v=4, min=1, max=16, h=22, w=40)
+        cmds.text(label="")
+        cmds.setParent("..")
+
+        _del_l = "\u8ee2\u5199\u5f8c\u306b\u30b1\u30fc\u30b8\u3092\u81ea\u52d5\u524a\u9664" if _LANG == "ja" else "Auto-delete cage after transfer"
+        self.cw_del_cb = cmds.checkBox(label=_del_l, v=False, h=22)
+
+        # --- Action buttons ---
+        cmds.separator(h=6, st="in")
+        cmds.rowLayout(nc=2, adj=1, h=40, cw=[(2, 200)])
+        _gen_l = "\u30b1\u30fc\u30b8\u751f\u6210" if _LANG == "ja" else "Generate cage"
+        cmds.button(label=_gen_l, h=36,
+                    c=lambda *a: self._cw_apply_and_preview())
+        _apply_l = "\u9069\u7528\uff08\u8ee2\u5199\uff09" if _LANG == "ja" else "Apply (transfer)"
+        cmds.button(label=_apply_l, h=36, bgc=(0.35, 0.55, 0.35),
+                    c=lambda *a: self._cw_apply_and_execute())
+        cmds.setParent("..")
+
+        cmds.showWindow(self.CW_BONE_WIN)
+
+    def _cw_select_joint(self, joint_path):
+        short = joint_path.split("|")[-1]
+        try:
+            if cmds.objExists(short):
+                cmds.select(short, r=True)
+            elif cmds.objExists(joint_path):
+                cmds.select(joint_path, r=True)
+        except Exception:
+            pass
+
+    def _cw_read_editor_modes(self):
+        if not hasattr(self, '_cw_bone_editor_menus'):
+            return
+        for joint_path, menu in self._cw_bone_editor_menus.items():
+            try:
+                idx = cmds.optionMenu(menu, q=True, sl=True) - 1
+                if 0 <= idx < len(CAGE_MODE_ORDER):
+                    self._cw_per_bone_menus_map[joint_path] = CAGE_MODE_ORDER[idx]
+                else:
+                    self._cw_per_bone_menus_map[joint_path] = "smooth"
+            except Exception:
+                pass
+
+    def _cw_get_per_bone_modes(self):
+        return dict(self._cw_per_bone_menus_map)
+
+    def _cw_get_target_branches(self):
+        if not self._cw_branch_checks:
+            return None
+        checked = []
+        for bi, branch in enumerate(self._cw_branches):
+            if not branch:
+                continue
+            tip = branch[-1]
+            for joint_path, cb in self._cw_branch_checks:
+                if joint_path == tip:
+                    try:
+                        if cmds.checkBox(cb, q=True, v=True):
+                            checked.append(bi)
+                    except Exception:
+                        checked.append(bi)
+                    break
+        if len(checked) == len(self._cw_branches):
+            return None
+        return checked if checked else None
+
+    # --- v5: Cage list management ---
+
+    def _cw_refresh_cage_list(self):
+        """Update the cage list widget with current tracked cages."""
+        if not hasattr(self, '_cw_cage_list'):
+            return
+        try:
+            cmds.textScrollList(self._cw_cage_list, e=True, ra=True)
+        except Exception:
+            return
+        for cage_name, branch_joints in self._cw_generated_cages:
+            exists = cmds.objExists(cage_name)
+            tip = branch_joints[-1].split("|")[-1] if branch_joints else "?"
+            status = "" if exists else " [DELETED]"
+            label = "{0} ({1}){2}".format(cage_name, tip, status)
+            cmds.textScrollList(self._cw_cage_list, e=True, a=label)
+
+    def _cw_cage_list_select(self):
+        """When user clicks a cage in the list, select it in the scene."""
+        idx_list = cmds.textScrollList(self._cw_cage_list, q=True, sii=True) or []
+        if not idx_list:
+            return
+        idx = idx_list[0] - 1
+        if idx < 0 or idx >= len(self._cw_generated_cages):
+            return
+        cage_name = self._cw_generated_cages[idx][0]
+        if cmds.objExists(cage_name):
+            cmds.select(cage_name, r=True)
+        else:
+            show_status("Cage not found: {0}".format(cage_name), True)
+
+    def _cw_delete_selected_cage(self):
+        """Delete the selected cage from scene and tracking list."""
+        idx_list = cmds.textScrollList(self._cw_cage_list, q=True, sii=True) or []
+        if not idx_list:
+            return
+        idx = idx_list[0] - 1
+        if idx < 0 or idx >= len(self._cw_generated_cages):
+            return
+        cage_name = self._cw_generated_cages[idx][0]
+        if cmds.objExists(cage_name):
+            try:
+                cmds.delete(cage_name)
+            except Exception:
+                pass
+        self._cw_generated_cages.pop(idx)
+        self._cw_refresh_cage_list()
+        show_status("Cage deleted: {0}".format(cage_name))
+
+    # --- v5: Preview and Execute ---
+
+    def _cw_apply_and_preview(self):
+        self._cw_read_editor_modes()
+        self._do_cw_preview()
+
+    def _cw_apply_and_execute(self):
+        self._cw_read_editor_modes()
+        self._do_cw_full()
+
+    def _do_cw_preview(self):
+        """Generate cage meshes (no transfer) for preview/editing.
+        v5: stores generated cage names in _cw_generated_cages."""
+        mesh = cmds.textField(self.cw_mf, q=True, tx=True)
+        joint = cmds.textField(self.cw_jf, q=True, tx=True)
+        if not joint: show_status("Set root joint.", True); return
+        if not mesh: show_status("Set target mesh.", True); return
         offset = cmds.floatField(self.cw_off, q=True, v=True)
-        subdivs = cmds.intField(self.cw_sub, q=True, v=True)
+        sides = cmds.intField(self.cw_sub_axis, q=True, v=True)
+        subdivs = cmds.intField(self.cw_sub_height, q=True, v=True)
+        target_branches = self._cw_get_target_branches()
+        per_bone_modes = self._cw_get_per_bone_modes()
+
+        # Delete previously tracked cages
+        for old_cage, _bj in self._cw_generated_cages:
+            if cmds.objExists(old_cage):
+                try:
+                    cmds.delete(old_cage)
+                except Exception:
+                    pass
+        self._cw_generated_cages = []
+
+        cage_results = generate_cage_mesh(
+            mesh, joint, subdivisions_per_seg=subdivs, offset=offset,
+            target_branches=target_branches, sides=sides)
+        if not cage_results:
+            show_status("Failed to generate cage.", True)
+            self._cw_refresh_cage_list()
+            return
+
+        # Apply per-bone weights and track results
+        ok = 0
+        for cage_transform, branch_joints in cage_results:
+            sc = apply_cage_weights_tree(cage_transform, branch_joints, per_bone_modes)
+            if sc:
+                ok += 1
+                self._cw_generated_cages.append((cage_transform, branch_joints))
+
+        self._cw_refresh_cage_list()
+        show_status("{0} cage(s) generated".format(ok))
+
+    def _do_cw_full(self):
+        """Transfer weights to target mesh via direct bone projection (v6)."""
+        mesh = cmds.textField(self.cw_mf, q=True, tx=True)
+        joint = cmds.textField(self.cw_jf, q=True, tx=True)
+        if not joint: show_status("Set root joint.", True); return
+        if not mesh: show_status("Set target mesh.", True); return
         del_cage = cmds.checkBox(self.cw_del_cb, q=True, v=True)
+        per_bone_modes = self._cw_get_per_bone_modes()
 
-        result = cage_weight_full(
-            mesh=mesh, root_joint=joint, modes=modes,
-            subdivisions=subdivs, offset=offset, delete_cage=del_cage)
+        if not self._cw_generated_cages:
+            show_status("No cage meshes generated. Generate first.", True)
+            return
 
-        if result:
+        rpt, ok_count, fail_count = transfer_tracked_cages(
+            self._cw_generated_cages, mesh, per_bone_modes,
+            delete_cage=del_cage)
+
+        # Clear tracking for deleted cages
+        if del_cage:
+            self._cw_generated_cages = [
+                (c, bj) for c, bj in self._cw_generated_cages
+                if cmds.objExists(c)
+            ]
+
+        self._cw_refresh_cage_list()
+
+        if ok_count > 0:
             show_status(tr("cg_done"))
         else:
             show_status(tr("cg_fail"), True)
 
-    def _do_cw_preview(self):
-        """Generate cage mesh only (no transfer), for preview."""
-        mesh = cmds.textField(self.cw_mf, q=True, tx=True)
-        joint = cmds.textField(self.cw_jf, q=True, tx=True)
-        if not joint:
-            show_status(tr("cg_no_joint"), True); return
-        if not mesh:
-            show_status(tr("cg_no_mesh"), True); return
-
-        offset = cmds.floatField(self.cw_off, q=True, v=True)
-        subdivs = cmds.intField(self.cw_sub, q=True, v=True)
-        modes = self._cw_get_modes()
-
-        cage_transform, joints = generate_cage_mesh(
-            mesh, joint, subdivisions=subdivs, offset=offset)
-        if cage_transform:
-            sc = apply_cage_weights(cage_transform, joints, modes)
-            if sc:
-                show_status("Preview: {0}".format(cage_transform))
-            else:
-                show_status("Preview cage created but weight failed.", True)
-        else:
-            show_status("Failed to generate cage.", True)
+        rpt.summary()
+        rpt.show_window()
 
     def _do_chk_dig(self):
-        u=cmds.floatField(self.ctf,q=True,v=True)
-        check_weight_digit(u)
-
+        u=cmds.floatField(self.ctf,q=True,v=True); check_weight_digit(u)
     def _do_clean_dig(self):
-        u=cmds.floatField(self.ctf,q=True,v=True)
-        clean_weight_digit(u)
-
+        u=cmds.floatField(self.ctf,q=True,v=True); clean_weight_digit(u)
     def _do_chk_inf(self):
-        n=cmds.intField(self.inf_f,q=True,v=True)
-        check_influence_count(n)
+        n=cmds.intField(self.inf_f,q=True,v=True); check_influence_count(n)
 
     # -- Joint Editor --
     def _jne(self):
@@ -2555,8 +3002,6 @@ class DoraSkinWeightUI(object):
         self._jne_upd()
     def _jne_rst(self):
         self._jnn=list(self._jno); self._jne_upd()
-
-
 # ============================================================================
 # Entry Point
 # ============================================================================

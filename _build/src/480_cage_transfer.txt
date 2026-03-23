@@ -1,135 +1,284 @@
-# --- [480] cage_transfer ---
+# --- [480] cage_transfer --- # v8 2026-03-23
 # ============================================================================
-# Cage Weight Transfer
+# Cage Weight Transfer (v8 — skip mode respected, rigid weapon support)
 # ============================================================================
-# Transfer weights from cage mesh to the target mesh, with cleanup.
-# Depends on: 000 (cmds), 100 (get_shape, get_skin_cluster)
+# v8 changes:
+#   - "skip" mode segments: vertices projecting to these are left untouched
+#   - Vertices only get new weights if their nearest segment is non-skip
+#   - This lets weapon/rigid parts keep their original weights
+# Depends on: 000 (cmds, om, oma, math), 040 (Report),
+#             100 (get_shape, get_skin_cluster, simple_obj_name),
+#             210 (_get_skin_fn, _get_dag_path, _bulk_get_weights,
+#                   _bulk_get_positions),
+#             450 (_get_bone_positions_world),
+#             460 (compute_segment_weight, modes_for_branch, _compat_mode)
 
-def transfer_cage_weights(cage_transform, target_mesh, delete_cage=True):
-    """Transfer skin weights from cage mesh to target mesh.
 
-    Uses Maya's copySkinWeights for robust spatial matching.
-
-    Args:
-        cage_transform: cage mesh with applied weights
-        target_mesh: destination mesh transform
-        delete_cage: if True, delete cage and its skinCluster after transfer
-
-    Returns:
-        True on success, False on failure.
+def _project_vertex_to_chain(vx, vy, vz, bone_pos, seg_lens):
+    """Project a vertex onto a bone chain.
+    Returns (best_segment_index, frac_within_segment, distance).
     """
-    # Validate cage
-    cage_shape = get_shape(cage_transform)
-    cage_sc = get_skin_cluster(cage_shape) if cage_shape else ""
-    if not cage_sc:
-        cmds.warning("Cage mesh has no skinCluster: {0}".format(cage_transform))
-        return False
+    best_seg = -1
+    best_frac = 0.0
+    best_dist = float('inf')
 
-    # Get joints from cage
-    cage_joints = cmds.listConnections(cage_sc + ".matrix", type="joint") or []
-    if not cage_joints:
-        cmds.warning("No joints found on cage skinCluster.")
-        return False
+    for si in range(len(seg_lens)):
+        slen = seg_lens[si]
+        if slen < 0.0001:
+            continue
 
-    # Validate target
+        ax = (bone_pos[si + 1][0] - bone_pos[si][0]) / slen
+        ay = (bone_pos[si + 1][1] - bone_pos[si][1]) / slen
+        az = (bone_pos[si + 1][2] - bone_pos[si][2]) / slen
+
+        dx = vx - bone_pos[si][0]
+        dy = vy - bone_pos[si][1]
+        dz = vz - bone_pos[si][2]
+
+        proj = dx * ax + dy * ay + dz * az
+        proj_clamped = max(0.0, min(slen, proj))
+        frac = proj_clamped / slen
+
+        cpx = bone_pos[si][0] + proj_clamped * ax
+        cpy = bone_pos[si][1] + proj_clamped * ay
+        cpz = bone_pos[si][2] + proj_clamped * az
+        dist = math.sqrt((vx - cpx) ** 2 + (vy - cpy) ** 2 + (vz - cpz) ** 2)
+
+        if dist < best_dist:
+            best_dist = dist
+            best_seg = si
+            best_frac = frac
+
+    return (best_seg, best_frac, best_dist)
+
+
+def direct_transfer_weights(target_mesh, branch_joints, per_bone_modes):
+    """Directly write weights to target mesh by projecting vertices onto bones.
+
+    Vertices whose nearest segment has mode "skip" are left untouched.
+    This preserves original weights on rigid/weapon parts.
+
+    Returns (num_affected, num_skipped).
+    """
+    num_bones = len(branch_joints)
+    if num_bones < 2:
+        return (0, 0)
+
+    bone_pos = _get_bone_positions_world(branch_joints)
+
+    seg_lens = []
+    for i in range(num_bones - 1):
+        dx = bone_pos[i + 1][0] - bone_pos[i][0]
+        dy = bone_pos[i + 1][1] - bone_pos[i][1]
+        dz = bone_pos[i + 1][2] - bone_pos[i][2]
+        seg_lens.append(math.sqrt(dx * dx + dy * dy + dz * dz))
+
+    seg_modes = modes_for_branch(branch_joints, per_bone_modes)
+
+    # Check if ALL segments are skip — nothing to do
+    non_skip = [m for m in seg_modes if m != "skip"]
+    if not non_skip:
+        return (0, 0)
+
     target_shape = get_shape(target_mesh)
     if not target_shape:
-        cmds.warning("Cannot find shape for target: {0}".format(target_mesh))
-        return False
+        cmds.warning("No shape: {0}".format(target_mesh))
+        return (0, 0)
 
-    # Ensure target has a skinCluster; if not, bind it
     target_sc = get_skin_cluster(target_shape)
     if not target_sc:
-        try:
-            cmds.select(cage_joints + [target_mesh], r=True)
-            result = cmds.skinCluster(
-                cage_joints, target_mesh,
-                toSelectedBones=True,
-                bindMethod=0,
-                normalizeWeights=1,
-                weightDistribution=0,
-                maximumInfluences=4,
-                obeyMaxInfluences=True,
-                removeUnusedInfluence=False,
-            )
-            target_sc = result[0] if isinstance(result, list) else result
-        except Exception as e:
-            cmds.warning("Failed to bind target mesh: {0}".format(e))
-            return False
+        cmds.warning("No skinCluster: {0}".format(target_mesh))
+        return (0, 0)
 
-    # Copy skin weights: cage -> target
-    try:
-        cmds.copySkinWeights(
-            sourceSkin=cage_sc,
-            destinationSkin=target_sc,
-            noMirror=True,
-            surfaceAssociation="closestPoint",
-            influenceAssociation=["name", "closestJoint", "oneToOne"],
-            normalize=True,
-        )
-    except Exception as e:
-        cmds.warning("copySkinWeights failed: {0}".format(e))
-        return False
+    # Ensure all branch joints are influences
+    existing_inf = set(cmds.skinCluster(target_sc, q=True, inf=True) or [])
+    for bj in branch_joints:
+        short = bj.split("|")[-1]
+        if short not in existing_inf:
+            try:
+                cmds.skinCluster(target_sc, e=True, addInfluence=bj,
+                                  weight=0.0, lockWeights=False)
+            except Exception:
+                pass
 
-    # Cleanup
-    if delete_cage:
-        try:
-            cmds.delete(cage_transform)
-        except Exception:
-            pass
+    all_infs = cmds.skinCluster(target_sc, q=True, inf=True) or []
+    num_inf = len(all_infs)
+    inf_index = {}
+    for i, name in enumerate(all_infs):
+        inf_index[name] = i
 
-    return True
+    branch_inf_indices = []
+    branch_inf_set = set()
+    for bj in branch_joints:
+        short = bj.split("|")[-1]
+        idx = inf_index.get(short, -1)
+        branch_inf_indices.append(idx)
+        if idx >= 0:
+            branch_inf_set.add(idx)
 
+    # Get vertex positions
+    vc = cmds.polyEvaluate(target_shape, vertex=True)
+    positions = _bulk_get_positions(target_shape, vc)
+    if not positions:
+        positions = []
+        for vi in range(vc):
+            p = cmds.pointPosition("{0}.vtx[{1}]".format(target_shape, vi), w=True)
+            positions.append((p[0], p[1], p[2]))
 
-def cage_weight_full(mesh, root_joint, preset_id=None, modes=None,
-                     subdivisions=8, offset=0.05, delete_cage=True):
-    """Full pipeline: generate cage -> apply weights -> transfer -> cleanup.
-
-    Args:
-        mesh: target mesh transform
-        root_joint: root of bone chain
-        preset_id: preset name (e.g. "hair_free"). Ignored if modes is given.
-        modes: explicit list of mode strings per segment. Overrides preset_id.
-        subdivisions: cage ring count
-        offset: cage expansion factor
-        delete_cage: delete cage after transfer
-
-    Returns:
-        True on success, False on failure.
-    """
-    # Generate cage
-    cage_transform, joints = generate_cage_mesh(mesh, root_joint,
-                                                 subdivisions=subdivisions,
-                                                 offset=offset)
-    if not cage_transform:
-        return False
-
-    num_segments = len(joints) - 1
-
-    # Determine modes
-    if modes is None:
-        if preset_id is None:
-            preset_id = "hair_free"
-        modes = adapt_preset_modes(preset_id, num_segments)
+    # Read current weights
+    bulk_w = _bulk_get_weights(target_sc, target_shape, vc, num_inf)
+    if bulk_w:
+        weight_buf = [list(vw) for vw in bulk_w]
     else:
-        # Adapt length
-        while len(modes) < num_segments:
-            modes.append("soft")
-        modes = modes[:num_segments]
+        weight_buf = [[0.0] * num_inf for _ in range(vc)]
 
-    # Apply preset weights to cage
-    sc = apply_cage_weights(cage_transform, joints, modes)
-    if not sc:
-        cmds.warning("Failed to apply weights to cage.")
+    # Disable normalize during batch write
+    orig_normalize = cmds.getAttr(target_sc + ".normalizeWeights")
+    cmds.setAttr(target_sc + ".normalizeWeights", 0)
+
+    affected = 0
+    skipped = 0
+    affected_indices = []
+
+    for vi in range(vc):
+        vx, vy, vz = positions[vi]
+        seg_i, frac, dist = _project_vertex_to_chain(vx, vy, vz,
+                                                       bone_pos, seg_lens)
+        if seg_i < 0:
+            skipped += 1
+            continue
+
+        # --- v8: skip mode check ---
+        # If the nearest segment is "skip", leave this vertex untouched
+        if seg_modes[seg_i] == "skip":
+            skipped += 1
+            continue
+
+        parent_ii = branch_inf_indices[seg_i]
+        child_ii = branch_inf_indices[seg_i + 1]
+
+        if parent_ii < 0 or child_ii < 0:
+            skipped += 1
+            continue
+
+        pw, cw = compute_segment_weight(seg_modes[seg_i], frac)
+
+        # Zero out branch weights
+        for bii in branch_inf_set:
+            weight_buf[vi][bii] = 0.0
+
+        # Set new weights
+        weight_buf[vi][parent_ii] = pw
+        weight_buf[vi][child_ii] = cw
+
+        # Renormalize non-branch weights
+        branch_total = pw + cw
+        non_branch_total = 0.0
+        for k in range(num_inf):
+            if k not in branch_inf_set:
+                non_branch_total += weight_buf[vi][k]
+
+        total = branch_total + non_branch_total
+        if total > 0.0001 and abs(total - 1.0) > 0.0001:
+            if non_branch_total > 0.0001:
+                scale = (1.0 - branch_total) / non_branch_total
+            else:
+                scale = 0.0
+            for k in range(num_inf):
+                if k not in branch_inf_set:
+                    weight_buf[vi][k] *= scale
+
+        affected += 1
+        affected_indices.append(vi)
+
+    # Bulk write via OpenMaya
+    write_ok = False
+    if affected_indices:
         try:
-            cmds.delete(cage_transform)
-        except Exception:
-            pass
-        return False
+            fn = _get_skin_fn(target_sc)
+            dp = _get_dag_path(target_shape)
 
-    # Transfer to target
-    success = transfer_cage_weights(cage_transform, mesh,
-                                     delete_cage=delete_cage)
-    return success
+            fn_comp = om.MFnSingleIndexedComponent()
+            comp = fn_comp.create(om.MFn.kMeshVertComponent)
+            for vi in affected_indices:
+                fn_comp.addElement(vi)
+
+            inf_arr = om.MIntArray(num_inf, 0)
+            for i in range(num_inf):
+                inf_arr[i] = i
+
+            w_arr = om.MDoubleArray(len(affected_indices) * num_inf, 0.0)
+            for ai, vi in enumerate(affected_indices):
+                for j in range(num_inf):
+                    w_arr[ai * num_inf + j] = weight_buf[vi][j]
+
+            fn.setWeights(dp, comp, inf_arr, w_arr, False)
+            write_ok = True
+        except Exception as e:
+            print("[CageTransfer] API write failed: {0}".format(e))
+
+    # Fallback
+    if not write_ok and affected_indices:
+        print("[CageTransfer] Falling back to cmds.skinPercent...")
+        for vi in affected_indices:
+            tv = []
+            for j in range(num_inf):
+                if weight_buf[vi][j] > 0.0001:
+                    tv.append((all_infs[j], weight_buf[vi][j]))
+            if tv:
+                try:
+                    cmds.skinPercent(target_sc,
+                                      "{0}.vtx[{1}]".format(target_shape, vi),
+                                      r=False, transformValue=tv)
+                except Exception:
+                    pass
+
+    # Restore normalize
+    cmds.setAttr(target_sc + ".normalizeWeights", orig_normalize)
+    if orig_normalize:
+        cmds.skinPercent(target_sc, target_shape, normalize=True)
+
+    return (affected, skipped)
 
 
+def transfer_tracked_cages(tracked_cages, target_mesh, per_bone_modes,
+                            delete_cage=True):
+    """Transfer weights for all tracked branches via direct projection.
+
+    Returns (report, ok_count, fail_count).
+    """
+    rpt = Report("Cage Transfer")
+    rpt.log("Target: {0}".format(target_mesh))
+    rpt.log("Branches: {0}".format(len(tracked_cages)))
+
+    ok_count = 0
+    fail_count = 0
+
+    for cage_name, branch_joints in tracked_cages:
+        tip = branch_joints[-1].split("|")[-1] if branch_joints else "?"
+        rpt.log("")
+        rpt.log("Branch: {0} ({1} joints)".format(tip, len(branch_joints)))
+
+        affected, skipped = direct_transfer_weights(
+            target_mesh, branch_joints, per_bone_modes)
+
+        if affected > 0:
+            ok_count += 1
+            rpt.log("  {0} verts written, {1} skipped".format(affected, skipped))
+        elif skipped > 0:
+            # All vertices skipped (e.g. all-skip branch) is not a failure
+            ok_count += 1
+            rpt.log("  All {0} verts skipped (skip mode)".format(skipped))
+        else:
+            fail_count += 1
+            rpt.error("  0 verts processed")
+
+        if delete_cage and cmds.objExists(cage_name):
+            try:
+                cmds.delete(cage_name)
+            except Exception:
+                pass
+
+    rpt.log("")
+    rpt.log("=== {0} OK, {1} failed ===".format(ok_count, fail_count))
+    return rpt, ok_count, fail_count
