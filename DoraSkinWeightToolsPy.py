@@ -1534,10 +1534,12 @@ def _create_maya_mesh(cage_verts, cage_faces):
 # ---- Shrinkwrap: snap cage to mesh surface ----
 
 def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
-    """Snap cage vertices to the target mesh outer surface.
+    """Snap cage vertices to the target mesh surface using closest point.
 
-    Must be called AFTER skinCluster bind. Temporarily disables the
-    cage's skinCluster envelope during vertex moves.
+    For each cage vertex, find the closest point on the target mesh,
+    then place the cage vertex at that point pushed outward along
+    the direction from bone center to surface point.
+    Must be called AFTER skinCluster bind.
     """
     target_shape = get_shape(target_mesh)
     if not target_shape:
@@ -1547,11 +1549,12 @@ def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
     if not cage_shape:
         return
 
-    # Find and disable cage skinCluster during shrinkwrap
+    # Disable cage skinCluster during vertex moves
     cage_sc = get_skin_cluster(cage_shape)
     if cage_sc:
         cmds.setAttr(cage_sc + ".envelope", 0)
 
+    # Get MFnMesh for closest point queries
     sel = om.MSelectionList()
     sel.add(target_shape)
     target_dag = om.MDagPath()
@@ -1570,7 +1573,7 @@ def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
         vp = cmds.pointPosition("{0}.vtx[{1}]".format(cage_transform, vi), w=True)
         vx, vy, vz = vp[0], vp[1], vp[2]
 
-        # Find nearest point on bone chain
+        # Find nearest point on bone chain (center line)
         best_cx, best_cy, best_cz = bone_pos[0]
         best_dist_sq = float('inf')
 
@@ -1597,55 +1600,36 @@ def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
                 best_dist_sq = d_sq
                 best_cx, best_cy, best_cz = cpx, cpy, cpz
 
-        orig_dist = math.sqrt(best_dist_sq) if best_dist_sq < float('inf') else 0.0
-        min_dist = orig_dist * 0.8
+        # Find closest point on target mesh surface
+        query_pt = om.MPoint(vx, vy, vz)
+        closest_pt = om.MPoint()
+        util = om.MScriptUtil()
+        util.createFromInt(0)
+        face_ptr = util.asIntPtr()
 
-        rdx = vx - best_cx
-        rdy = vy - best_cy
-        rdz = vz - best_cz
-        ray_len = math.sqrt(rdx * rdx + rdy * rdy + rdz * rdz)
-        if ray_len < 0.0001:
-            continue
-        rdx /= ray_len
-        rdy /= ray_len
-        rdz /= ray_len
+        target_fn.getClosestPoint(query_pt, closest_pt, om.MSpace.kWorld, face_ptr)
 
-        ray_src = om.MFloatPoint(best_cx, best_cy, best_cz)
-        ray_dir = om.MFloatVector(rdx, rdy, rdz)
+        # Direction: from bone center through surface point (outward)
+        sx, sy, sz = closest_pt.x, closest_pt.y, closest_pt.z
+        dir_x = sx - best_cx
+        dir_y = sy - best_cy
+        dir_z = sz - best_cz
+        dir_len = math.sqrt(dir_x * dir_x + dir_y * dir_y + dir_z * dir_z)
 
-        hit_points = om.MFloatPointArray()
-        hit_params = om.MFloatArray()
-        hit_faces = om.MIntArray()
+        if dir_len > 0.0001:
+            dir_x /= dir_len
+            dir_y /= dir_len
+            dir_z /= dir_len
+            # Place at surface + offset outward from bone center
+            new_x = sx + dir_x * offset
+            new_y = sy + dir_y * offset
+            new_z = sz + dir_z * offset
+        else:
+            # Fallback: keep original position
+            new_x, new_y, new_z = vx, vy, vz
 
-        hit = target_fn.allIntersections(
-            ray_src, ray_dir,
-            None, None, False,
-            om.MSpace.kWorld, 9999.0, False,
-            None, False,
-            hit_points, hit_params, hit_faces,
-            None, None, None)
-
-        if hit and hit_points.length() > 0:
-            best_param = 0.0
-            best_idx = 0
-            for hi in range(hit_params.length()):
-                if hit_params[hi] > best_param:
-                    best_param = hit_params[hi]
-                    best_idx = hi
-
-            hp = hit_points[best_idx]
-            hit_dist = math.sqrt(
-                (hp.x - best_cx) ** 2 +
-                (hp.y - best_cy) ** 2 +
-                (hp.z - best_cz) ** 2)
-
-            target_dist = max(hit_dist + offset, min_dist)
-
-            new_x = best_cx + rdx * target_dist
-            new_y = best_cy + rdy * target_dist
-            new_z = best_cz + rdz * target_dist
-            cmds.xform("{0}.vtx[{1}]".format(cage_transform, vi),
-                        ws=True, t=(new_x, new_y, new_z))
+        cmds.xform("{0}.vtx[{1}]".format(cage_transform, vi),
+                    ws=True, t=(new_x, new_y, new_z))
 
     # Re-enable skinCluster
     if cage_sc:
