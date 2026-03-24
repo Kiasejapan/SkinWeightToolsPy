@@ -1531,11 +1531,119 @@ def _create_maya_mesh(cage_verts, cage_faces):
     return dag.partialPathName()
 
 
+# ---- Shrinkwrap: snap cage to mesh surface ----
+
+def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
+    """Snap cage vertices to the target mesh surface.
+
+    For each cage vertex, cast a ray from the nearest bone chain center
+    outward through the vertex. If it hits the target mesh, move the
+    vertex to the hit point (plus offset margin).
+    If no hit, keep the original position.
+    """
+    target_shape = get_shape(target_mesh)
+    if not target_shape:
+        return
+
+    cage_shape = get_shape(cage_transform)
+    if not cage_shape:
+        return
+
+    # Get MFnMesh for raycasting on target
+    sel = om.MSelectionList()
+    sel.add(target_shape)
+    target_dag = om.MDagPath()
+    sel.getDagPath(0, target_dag)
+    target_fn = om.MFnMesh(target_dag)
+
+    # Get cage vertex count
+    vc = cmds.polyEvaluate(cage_shape, vertex=True)
+    if vc == 0:
+        return
+
+    # Pre-compute bone chain centers and total length for nearest-center lookup
+    num_bones = len(bone_pos)
+
+    # For each cage vertex, find nearest point on bone chain, then raycast
+    for vi in range(vc):
+        vp = cmds.pointPosition("{0}.vtx[{1}]".format(cage_shape, vi), w=True)
+        vx, vy, vz = vp[0], vp[1], vp[2]
+
+        # Find nearest point on bone chain (closest segment)
+        best_cx, best_cy, best_cz = bone_pos[0]
+        best_dist_sq = float('inf')
+
+        for si in range(num_bones - 1):
+            ax = bone_pos[si + 1][0] - bone_pos[si][0]
+            ay = bone_pos[si + 1][1] - bone_pos[si][1]
+            az = bone_pos[si + 1][2] - bone_pos[si][2]
+            slen_sq = ax * ax + ay * ay + az * az
+            if slen_sq < 0.0001:
+                continue
+            slen = math.sqrt(slen_sq)
+
+            dx = vx - bone_pos[si][0]
+            dy = vy - bone_pos[si][1]
+            dz = vz - bone_pos[si][2]
+            proj = (dx * ax + dy * ay + dz * az) / slen_sq
+            proj = max(0.0, min(1.0, proj))
+
+            cpx = bone_pos[si][0] + proj * ax
+            cpy = bone_pos[si][1] + proj * ay
+            cpz = bone_pos[si][2] + proj * az
+
+            d_sq = (vx - cpx) ** 2 + (vy - cpy) ** 2 + (vz - cpz) ** 2
+            if d_sq < best_dist_sq:
+                best_dist_sq = d_sq
+                best_cx, best_cy, best_cz = cpx, cpy, cpz
+
+        # Ray direction: from bone center outward through vertex
+        rdx = vx - best_cx
+        rdy = vy - best_cy
+        rdz = vz - best_cz
+        ray_len = math.sqrt(rdx * rdx + rdy * rdy + rdz * rdz)
+        if ray_len < 0.0001:
+            continue
+        rdx /= ray_len
+        rdy /= ray_len
+        rdz /= ray_len
+
+        # Raycast from bone center outward
+        ray_src = om.MFloatPoint(best_cx, best_cy, best_cz)
+        ray_dir = om.MFloatVector(rdx, rdy, rdz)
+
+        hit_point = om.MFloatPoint()
+        hit_param_util = om.MScriptUtil()
+        hit_param_util.createFromDouble(0.0)
+        hit_param_ptr = hit_param_util.asFloatPtr()
+
+        hit = target_fn.closestIntersection(
+            ray_src, ray_dir,
+            None, None,  # no face/triangle filter
+            False,       # idsSorted
+            om.MSpace.kWorld,
+            9999.0,      # maxParam
+            False,       # testBothDirections
+            None,        # accelParams
+            hit_point,
+            hit_param_ptr,
+            None, None, None, None  # hitFace, hitTri, hitBary1, hitBary2
+        )
+
+        if hit:
+            # Move vertex to hit point + small offset outward
+            new_x = hit_point.x + rdx * offset
+            new_y = hit_point.y + rdy * offset
+            new_z = hit_point.z + rdz * offset
+            cmds.xform("{0}.vtx[{1}]".format(cage_transform, vi),
+                        ws=True, t=(new_x, new_y, new_z))
+
+
 # ---- Public API ----
 
 def generate_cage_for_branch(mesh, branch_joints, subdivisions_per_seg=4,
                               offset=0.05, sides=8):
-    """Generate a cage tube for one branch from bone positions."""
+    """Generate a cage tube for one branch, then shrinkwrap to mesh."""
     if len(branch_joints) < 2:
         return None
     bone_pos = _get_bone_positions_world(branch_joints)
@@ -1546,6 +1654,11 @@ def generate_cage_for_branch(mesh, branch_joints, subdivisions_per_seg=4,
     mesh_name = simple_obj_name(mesh) if mesh else "cage"
     cage_name = "{0}_{1}_cage".format(mesh_name, branch_tip)
     cage_transform = cmds.rename(cage_transform, cage_name)
+
+    # Shrinkwrap to target mesh
+    if mesh:
+        _shrinkwrap_cage(cage_transform, mesh, bone_pos, offset)
+
     return cage_transform
 
 
