@@ -1536,11 +1536,8 @@ def _create_maya_mesh(cage_verts, cage_faces):
 def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
     """Snap cage vertices to the target mesh outer surface.
 
-    Strategy: for each cage vertex, raycast from bone center outward.
-    - If farthest hit is FARTHER than current vertex: move to hit (expand)
-    - If farthest hit is CLOSER than current vertex: move to hit (shrink to surface)
-    - Never shrink below 80% of original radius
-    - Net effect: cage conforms to mesh surface from outside
+    Must be called AFTER skinCluster bind. Temporarily disables the
+    cage's skinCluster envelope during vertex moves.
     """
     target_shape = get_shape(target_mesh)
     if not target_shape:
@@ -1550,6 +1547,11 @@ def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
     if not cage_shape:
         return
 
+    # Find and disable cage skinCluster during shrinkwrap
+    cage_sc = get_skin_cluster(cage_shape)
+    if cage_sc:
+        cmds.setAttr(cage_sc + ".envelope", 0)
+
     sel = om.MSelectionList()
     sel.add(target_shape)
     target_dag = om.MDagPath()
@@ -1558,6 +1560,8 @@ def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
 
     vc = cmds.polyEvaluate(cage_shape, vertex=True)
     if vc == 0:
+        if cage_sc:
+            cmds.setAttr(cage_sc + ".envelope", 1)
         return
 
     num_bones = len(bone_pos)
@@ -1596,7 +1600,6 @@ def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
         orig_dist = math.sqrt(best_dist_sq) if best_dist_sq < float('inf') else 0.0
         min_dist = orig_dist * 0.8
 
-        # Ray direction: bone center -> vertex (outward)
         rdx = vx - best_cx
         rdy = vy - best_cy
         rdz = vz - best_cz
@@ -1623,7 +1626,6 @@ def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
             None, None, None)
 
         if hit and hit_points.length() > 0:
-            # Find farthest hit (outermost mesh surface)
             best_param = 0.0
             best_idx = 0
             for hi in range(hit_params.length()):
@@ -1637,7 +1639,6 @@ def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
                 (hp.y - best_cy) ** 2 +
                 (hp.z - best_cz) ** 2)
 
-            # Target distance: mesh surface + offset, but not below minimum
             target_dist = max(hit_dist + offset, min_dist)
 
             new_x = best_cx + rdx * target_dist
@@ -1645,6 +1646,10 @@ def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
             new_z = best_cz + rdz * target_dist
             cmds.xform("{0}.vtx[{1}]".format(cage_transform, vi),
                         ws=True, t=(new_x, new_y, new_z))
+
+    # Re-enable skinCluster
+    if cage_sc:
+        cmds.setAttr(cage_sc + ".envelope", 1)
 
 
 # ---- Public API ----
