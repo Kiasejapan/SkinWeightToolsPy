@@ -334,12 +334,12 @@ def _create_maya_mesh(cage_verts, cage_faces):
 # ---- Shrinkwrap: snap cage to mesh surface ----
 
 def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
-    """Snap cage vertices to the target mesh surface.
+    """Snap cage vertices to the target mesh outer surface.
 
-    For each cage vertex, cast a ray from the nearest bone chain center
-    outward through the vertex. If it hits the target mesh, move the
-    vertex to the hit point (plus offset margin).
-    If no hit, keep the original position.
+    For each cage vertex, cast a ray from the bone chain center outward.
+    Uses the FARTHEST hit (outermost surface) so the cage wraps the
+    outside of the mesh, not internal cavities.
+    Never shrinks below 80% of the original circular radius.
     """
     target_shape = get_shape(target_mesh)
     if not target_shape:
@@ -349,27 +349,23 @@ def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
     if not cage_shape:
         return
 
-    # Get MFnMesh for raycasting on target
     sel = om.MSelectionList()
     sel.add(target_shape)
     target_dag = om.MDagPath()
     sel.getDagPath(0, target_dag)
     target_fn = om.MFnMesh(target_dag)
 
-    # Get cage vertex count
     vc = cmds.polyEvaluate(cage_shape, vertex=True)
     if vc == 0:
         return
 
-    # Pre-compute bone chain centers and total length for nearest-center lookup
     num_bones = len(bone_pos)
 
-    # For each cage vertex, find nearest point on bone chain, then raycast
     for vi in range(vc):
         vp = cmds.pointPosition("{0}.vtx[{1}]".format(cage_shape, vi), w=True)
         vx, vy, vz = vp[0], vp[1], vp[2]
 
-        # Find nearest point on bone chain (closest segment)
+        # Find nearest point on bone chain
         best_cx, best_cy, best_cz = bone_pos[0]
         best_dist_sq = float('inf')
 
@@ -380,7 +376,6 @@ def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
             slen_sq = ax * ax + ay * ay + az * az
             if slen_sq < 0.0001:
                 continue
-            slen = math.sqrt(slen_sq)
 
             dx = vx - bone_pos[si][0]
             dy = vy - bone_pos[si][1]
@@ -397,7 +392,11 @@ def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
                 best_dist_sq = d_sq
                 best_cx, best_cy, best_cz = cpx, cpy, cpz
 
-        # Ray direction: from bone center outward through vertex
+        # Original distance from bone center (circular cage radius)
+        orig_dist = math.sqrt(best_dist_sq) if best_dist_sq < float('inf') else 0.0
+        min_dist = orig_dist * 0.8  # never shrink below 80%
+
+        # Ray direction: bone center -> vertex (outward)
         rdx = vx - best_cx
         rdy = vy - best_cy
         rdz = vz - best_cz
@@ -408,33 +407,50 @@ def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
         rdy /= ray_len
         rdz /= ray_len
 
-        # Raycast from bone center outward
+        # Collect ALL hits along the ray using allIntersections
         ray_src = om.MFloatPoint(best_cx, best_cy, best_cz)
         ray_dir = om.MFloatVector(rdx, rdy, rdz)
 
-        hit_point = om.MFloatPoint()
-        hit_param_util = om.MScriptUtil()
-        hit_param_util.createFromDouble(0.0)
-        hit_param_ptr = hit_param_util.asFloatPtr()
+        hit_points = om.MFloatPointArray()
+        hit_params = om.MFloatArray()
+        hit_faces = om.MIntArray()
 
-        hit = target_fn.closestIntersection(
+        hit = target_fn.allIntersections(
             ray_src, ray_dir,
-            None, None,  # no face/triangle filter
-            False,       # idsSorted
+            None, None,      # faceIds, triIds
+            False,           # idsSorted
             om.MSpace.kWorld,
-            9999.0,      # maxParam
-            False,       # testBothDirections
-            None,        # accelParams
-            hit_point,
-            hit_param_ptr,
-            None, None, None, None  # hitFace, hitTri, hitBary1, hitBary2
+            9999.0,          # maxParam
+            False,           # testBothDirections
+            None,            # accelParams
+            False,           # sortHits (we find max ourselves)
+            hit_points,
+            hit_params,
+            hit_faces,
+            None, None, None  # hitBary, etc.
         )
 
-        if hit:
-            # Move vertex to hit point + small offset outward
-            new_x = hit_point.x + rdx * offset
-            new_y = hit_point.y + rdy * offset
-            new_z = hit_point.z + rdz * offset
+        if hit and hit_points.length() > 0:
+            # Find the farthest hit (outermost surface)
+            best_param = 0.0
+            best_idx = 0
+            for hi in range(hit_params.length()):
+                if hit_params[hi] > best_param:
+                    best_param = hit_params[hi]
+                    best_idx = hi
+
+            hp = hit_points[best_idx]
+            hit_dist = math.sqrt(
+                (hp.x - best_cx) ** 2 +
+                (hp.y - best_cy) ** 2 +
+                (hp.z - best_cz) ** 2)
+
+            # Enforce minimum distance
+            final_dist = max(hit_dist, min_dist)
+
+            new_x = best_cx + rdx * (final_dist + offset)
+            new_y = best_cy + rdy * (final_dist + offset)
+            new_z = best_cz + rdz * (final_dist + offset)
             cmds.xform("{0}.vtx[{1}]".format(cage_transform, vi),
                         ws=True, t=(new_x, new_y, new_z))
 
