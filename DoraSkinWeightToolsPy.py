@@ -1534,11 +1534,10 @@ def _create_maya_mesh(cage_verts, cage_faces):
 # ---- Shrinkwrap: snap cage to mesh surface ----
 
 def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
-    """Snap cage vertices to the target mesh surface using closest point.
+    """Snap cage vertices to mesh surface in radial direction only.
 
-    For each cage vertex, find the closest point on the target mesh,
-    then place the cage vertex at that point pushed outward along
-    the direction from bone center to surface point.
+    Each cage vertex keeps its position along the bone axis (height),
+    but moves radially (perpendicular to bone) to match the mesh surface.
     Must be called AFTER skinCluster bind.
     """
     target_shape = get_shape(target_mesh)
@@ -1549,12 +1548,11 @@ def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
     if not cage_shape:
         return
 
-    # Disable cage skinCluster during vertex moves
+    # Disable cage skinCluster
     cage_sc = get_skin_cluster(cage_shape)
     if cage_sc:
         cmds.setAttr(cage_sc + ".envelope", 0)
 
-    # Get MFnMesh for closest point queries
     sel = om.MSelectionList()
     sel.add(target_shape)
     target_dag = om.MDagPath()
@@ -1573,60 +1571,79 @@ def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
         vp = cmds.pointPosition("{0}.vtx[{1}]".format(cage_transform, vi), w=True)
         vx, vy, vz = vp[0], vp[1], vp[2]
 
-        # Find nearest point on bone chain (center line)
+        # Find nearest point on bone chain and the segment axis
         best_cx, best_cy, best_cz = bone_pos[0]
+        best_ax, best_ay, best_az = 0.0, 1.0, 0.0
         best_dist_sq = float('inf')
 
         for si in range(num_bones - 1):
-            ax = bone_pos[si + 1][0] - bone_pos[si][0]
-            ay = bone_pos[si + 1][1] - bone_pos[si][1]
-            az = bone_pos[si + 1][2] - bone_pos[si][2]
-            slen_sq = ax * ax + ay * ay + az * az
+            seg_dx = bone_pos[si + 1][0] - bone_pos[si][0]
+            seg_dy = bone_pos[si + 1][1] - bone_pos[si][1]
+            seg_dz = bone_pos[si + 1][2] - bone_pos[si][2]
+            slen_sq = seg_dx * seg_dx + seg_dy * seg_dy + seg_dz * seg_dz
             if slen_sq < 0.0001:
                 continue
 
             dx = vx - bone_pos[si][0]
             dy = vy - bone_pos[si][1]
             dz = vz - bone_pos[si][2]
-            proj = (dx * ax + dy * ay + dz * az) / slen_sq
+            proj = (dx * seg_dx + dy * seg_dy + dz * seg_dz) / slen_sq
             proj = max(0.0, min(1.0, proj))
 
-            cpx = bone_pos[si][0] + proj * ax
-            cpy = bone_pos[si][1] + proj * ay
-            cpz = bone_pos[si][2] + proj * az
+            cpx = bone_pos[si][0] + proj * seg_dx
+            cpy = bone_pos[si][1] + proj * seg_dy
+            cpz = bone_pos[si][2] + proj * seg_dz
 
             d_sq = (vx - cpx) ** 2 + (vy - cpy) ** 2 + (vz - cpz) ** 2
             if d_sq < best_dist_sq:
                 best_dist_sq = d_sq
                 best_cx, best_cy, best_cz = cpx, cpy, cpz
+                slen = math.sqrt(slen_sq)
+                best_ax = seg_dx / slen
+                best_ay = seg_dy / slen
+                best_az = seg_dz / slen
 
-        # Find closest point on target mesh surface
-        query_pt = om.MPoint(vx, vy, vz)
-        closest_pt = om.MPoint()
+        # Radial direction: from bone center to vertex, with axis component removed
+        rdx = vx - best_cx
+        rdy = vy - best_cy
+        rdz = vz - best_cz
+        # Remove axis component
+        dot_axis = rdx * best_ax + rdy * best_ay + rdz * best_az
+        rdx -= dot_axis * best_ax
+        rdy -= dot_axis * best_ay
+        rdz -= dot_axis * best_az
+        radial_len = math.sqrt(rdx * rdx + rdy * rdy + rdz * rdz)
+        if radial_len < 0.0001:
+            continue
+        rdx /= radial_len
+        rdy /= radial_len
+        rdz /= radial_len
+
+        # Find closest point on mesh
+        qp = om.MPoint(vx, vy, vz)
+        cp = om.MPoint()
         util = om.MScriptUtil()
         util.createFromInt(0)
-        face_ptr = util.asIntPtr()
+        fp = util.asIntPtr()
+        target_fn.getClosestPoint(qp, cp, om.MSpace.kWorld, fp)
 
-        target_fn.getClosestPoint(query_pt, closest_pt, om.MSpace.kWorld, face_ptr)
+        # Project the closest point back to get only radial distance
+        # Vector from bone center to closest mesh point
+        mx = cp.x - best_cx
+        my = cp.y - best_cy
+        mz = cp.z - best_cz
+        # Remove axis component
+        dot_m = mx * best_ax + my * best_ay + mz * best_az
+        mx -= dot_m * best_ax
+        my -= dot_m * best_ay
+        mz -= dot_m * best_az
+        mesh_radial = math.sqrt(mx * mx + my * my + mz * mz)
 
-        # Direction: from bone center through surface point (outward)
-        sx, sy, sz = closest_pt.x, closest_pt.y, closest_pt.z
-        dir_x = sx - best_cx
-        dir_y = sy - best_cy
-        dir_z = sz - best_cz
-        dir_len = math.sqrt(dir_x * dir_x + dir_y * dir_y + dir_z * dir_z)
-
-        if dir_len > 0.0001:
-            dir_x /= dir_len
-            dir_y /= dir_len
-            dir_z /= dir_len
-            # Place at surface + offset outward from bone center
-            new_x = sx + dir_x * offset
-            new_y = sy + dir_y * offset
-            new_z = sz + dir_z * offset
-        else:
-            # Fallback: keep original position
-            new_x, new_y, new_z = vx, vy, vz
+        # New position: bone center + original axis offset + radial direction * mesh distance
+        target_radial = mesh_radial + offset
+        new_x = best_cx + dot_axis * best_ax + rdx * target_radial
+        new_y = best_cy + dot_axis * best_ay + rdy * target_radial
+        new_z = best_cz + dot_axis * best_az + rdz * target_radial
 
         cmds.xform("{0}.vtx[{1}]".format(cage_transform, vi),
                     ws=True, t=(new_x, new_y, new_z))
