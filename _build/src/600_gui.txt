@@ -596,11 +596,14 @@ class DoraSkinWeightUI(object):
             self._cw_refresh_cage_list()
             return
 
-        # Apply per-bone weights and track results
+        # Apply per-bone weights, then shrinkwrap, and track results
         ok = 0
         for cage_transform, branch_joints in cage_results:
             sc = apply_cage_weights_tree(cage_transform, branch_joints, per_bone_modes)
             if sc:
+                # Shrinkwrap AFTER skinCluster bind (bind resets vertex positions)
+                bone_pos = _get_bone_positions_world(branch_joints)
+                _shrinkwrap_cage(cage_transform, mesh, bone_pos, offset)
                 ok += 1
                 self._cw_generated_cages.append((cage_transform, branch_joints))
 

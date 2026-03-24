@@ -459,7 +459,7 @@ def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
 
 def generate_cage_for_branch(mesh, branch_joints, subdivisions_per_seg=4,
                               offset=0.05, sides=8):
-    """Generate a cage tube for one branch, then shrinkwrap to mesh."""
+    """Generate a cage tube for one branch (no shrinkwrap here)."""
     if len(branch_joints) < 2:
         return None
     bone_pos = _get_bone_positions_world(branch_joints)
@@ -470,11 +470,6 @@ def generate_cage_for_branch(mesh, branch_joints, subdivisions_per_seg=4,
     mesh_name = simple_obj_name(mesh) if mesh else "cage"
     cage_name = "{0}_{1}_cage".format(mesh_name, branch_tip)
     cage_transform = cmds.rename(cage_transform, cage_name)
-
-    # Shrinkwrap to target mesh
-    if mesh:
-        _shrinkwrap_cage(cage_transform, mesh, bone_pos, offset)
-
     return cage_transform
 
 

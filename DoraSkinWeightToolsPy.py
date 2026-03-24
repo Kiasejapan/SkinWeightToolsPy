@@ -1659,7 +1659,7 @@ def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
 
 def generate_cage_for_branch(mesh, branch_joints, subdivisions_per_seg=4,
                               offset=0.05, sides=8):
-    """Generate a cage tube for one branch, then shrinkwrap to mesh."""
+    """Generate a cage tube for one branch (no shrinkwrap here)."""
     if len(branch_joints) < 2:
         return None
     bone_pos = _get_bone_positions_world(branch_joints)
@@ -1670,11 +1670,6 @@ def generate_cage_for_branch(mesh, branch_joints, subdivisions_per_seg=4,
     mesh_name = simple_obj_name(mesh) if mesh else "cage"
     cage_name = "{0}_{1}_cage".format(mesh_name, branch_tip)
     cage_transform = cmds.rename(cage_transform, cage_name)
-
-    # Shrinkwrap to target mesh
-    if mesh:
-        _shrinkwrap_cage(cage_transform, mesh, bone_pos, offset)
-
     return cage_transform
 
 
@@ -3025,11 +3020,14 @@ class DoraSkinWeightUI(object):
             self._cw_refresh_cage_list()
             return
 
-        # Apply per-bone weights and track results
+        # Apply per-bone weights, then shrinkwrap, and track results
         ok = 0
         for cage_transform, branch_joints in cage_results:
             sc = apply_cage_weights_tree(cage_transform, branch_joints, per_bone_modes)
             if sc:
+                # Shrinkwrap AFTER skinCluster bind (bind resets vertex positions)
+                bone_pos = _get_bone_positions_world(branch_joints)
+                _shrinkwrap_cage(cage_transform, mesh, bone_pos, offset)
                 ok += 1
                 self._cw_generated_cages.append((cage_transform, branch_joints))
 
