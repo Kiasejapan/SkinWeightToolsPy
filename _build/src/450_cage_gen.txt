@@ -336,10 +336,11 @@ def _create_maya_mesh(cage_verts, cage_faces):
 def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
     """Snap cage vertices to the target mesh outer surface.
 
-    For each cage vertex, cast a ray from the bone chain center outward.
-    Uses the FARTHEST hit (outermost surface) so the cage wraps the
-    outside of the mesh, not internal cavities.
-    Never shrinks below 80% of the original circular radius.
+    Strategy: for each cage vertex, raycast from bone center outward.
+    - If farthest hit is FARTHER than current vertex: move to hit (expand)
+    - If farthest hit is CLOSER than current vertex: move to hit (shrink to surface)
+    - Never shrink below 80% of original radius
+    - Net effect: cage conforms to mesh surface from outside
     """
     target_shape = get_shape(target_mesh)
     if not target_shape:
@@ -362,7 +363,7 @@ def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
     num_bones = len(bone_pos)
 
     for vi in range(vc):
-        vp = cmds.pointPosition("{0}.vtx[{1}]".format(cage_shape, vi), w=True)
+        vp = cmds.pointPosition("{0}.vtx[{1}]".format(cage_transform, vi), w=True)
         vx, vy, vz = vp[0], vp[1], vp[2]
 
         # Find nearest point on bone chain
@@ -392,9 +393,8 @@ def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
                 best_dist_sq = d_sq
                 best_cx, best_cy, best_cz = cpx, cpy, cpz
 
-        # Original distance from bone center (circular cage radius)
         orig_dist = math.sqrt(best_dist_sq) if best_dist_sq < float('inf') else 0.0
-        min_dist = orig_dist * 0.8  # never shrink below 80%
+        min_dist = orig_dist * 0.8
 
         # Ray direction: bone center -> vertex (outward)
         rdx = vx - best_cx
@@ -407,7 +407,6 @@ def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
         rdy /= ray_len
         rdz /= ray_len
 
-        # Collect ALL hits along the ray using allIntersections
         ray_src = om.MFloatPoint(best_cx, best_cy, best_cz)
         ray_dir = om.MFloatVector(rdx, rdy, rdz)
 
@@ -417,21 +416,14 @@ def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
 
         hit = target_fn.allIntersections(
             ray_src, ray_dir,
-            None, None,      # faceIds, triIds
-            False,           # idsSorted
-            om.MSpace.kWorld,
-            9999.0,          # maxParam
-            False,           # testBothDirections
-            None,            # accelParams
-            False,           # sortHits (we find max ourselves)
-            hit_points,
-            hit_params,
-            hit_faces,
-            None, None, None  # hitBary, etc.
-        )
+            None, None, False,
+            om.MSpace.kWorld, 9999.0, False,
+            None, False,
+            hit_points, hit_params, hit_faces,
+            None, None, None)
 
         if hit and hit_points.length() > 0:
-            # Find the farthest hit (outermost surface)
+            # Find farthest hit (outermost mesh surface)
             best_param = 0.0
             best_idx = 0
             for hi in range(hit_params.length()):
@@ -445,12 +437,12 @@ def _shrinkwrap_cage(cage_transform, target_mesh, bone_pos, offset=0.05):
                 (hp.y - best_cy) ** 2 +
                 (hp.z - best_cz) ** 2)
 
-            # Enforce minimum distance
-            final_dist = max(hit_dist, min_dist)
+            # Target distance: mesh surface + offset, but not below minimum
+            target_dist = max(hit_dist + offset, min_dist)
 
-            new_x = best_cx + rdx * (final_dist + offset)
-            new_y = best_cy + rdy * (final_dist + offset)
-            new_z = best_cz + rdz * (final_dist + offset)
+            new_x = best_cx + rdx * target_dist
+            new_y = best_cy + rdy * target_dist
+            new_z = best_cz + rdz * target_dist
             cmds.xform("{0}.vtx[{1}]".format(cage_transform, vi),
                         ws=True, t=(new_x, new_y, new_z))
 
