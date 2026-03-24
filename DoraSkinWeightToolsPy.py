@@ -1468,25 +1468,35 @@ def _build_tube_mesh(bone_pos, radii, subdivisions_per_seg=4, sides=8):
             tx, ty, tz = 0.0, 1.0, 0.0
         tangents.append((tx, ty, tz))
 
-    # Build vertices: each ring gets an independent orthogonal frame
+    # Choose a single up axis for the entire chain (from first tangent)
+    t0x, t0y, t0z = tangents[0]
+    a0x = abs(t0x); a0y = abs(t0y); a0z = abs(t0z)
+    if a0y <= a0x and a0y <= a0z:
+        chain_upx, chain_upy, chain_upz = 0.0, 1.0, 0.0
+    elif a0x <= a0z:
+        chain_upx, chain_upy, chain_upz = 1.0, 0.0, 0.0
+    else:
+        chain_upx, chain_upy, chain_upz = 0.0, 0.0, 1.0
+
+    # Build vertices: each ring uses the same up axis for consistent orientation
     cage_verts = []
     for ri in range(len(centers)):
         cx, cy, cz = centers[ri]
         r = ring_radii[ri]
         tx, ty, tz = tangents[ri]
 
-        # Choose world up axis: pick the one least aligned with tangent
-        atx = abs(tx); aty = abs(ty); atz = abs(tz)
-        if aty <= atx and aty <= atz:
-            upx, upy, upz = 0.0, 1.0, 0.0
-        elif atx <= atz:
-            upx, upy, upz = 1.0, 0.0, 0.0
-        else:
-            upx, upy, upz = 0.0, 0.0, 1.0
-
-        # right = tangent x up
-        rx, ry, rz = _vec_cross(tx, ty, tz, upx, upy, upz)
+        # right = tangent x chain_up
+        rx, ry, rz = _vec_cross(tx, ty, tz, chain_upx, chain_upy, chain_upz)
         rx, ry, rz = _vec_normalize(rx, ry, rz)
+
+        # If tangent is nearly parallel to up, fall back
+        if rx == 0.0 and ry == 0.0 and rz == 0.0:
+            if chain_upy > 0.5:
+                rx, ry, rz = _vec_cross(tx, ty, tz, 1.0, 0.0, 0.0)
+            else:
+                rx, ry, rz = _vec_cross(tx, ty, tz, 0.0, 1.0, 0.0)
+            rx, ry, rz = _vec_normalize(rx, ry, rz)
+
         # forward = right x tangent
         fx, fy, fz = _vec_cross(rx, ry, rz, tx, ty, tz)
         fx, fy, fz = _vec_normalize(fx, fy, fz)
