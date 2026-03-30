@@ -2349,34 +2349,100 @@ def _quantize_weight_params(params, unit=0.01):
     return rounded
 
 def check_same_position():
+    """Find vertices at the same position with different weights.
+    Uses bulk OpenMaya API for positions and weights, with rounded
+    weight comparison to avoid false positives from float precision."""
     sl=cmds.filterExpand(sm=12) or []
     if not sl: show_status("No skinned mesh selected",True); return 0
     sh=get_shape(sl[0]); sc=get_skin_cluster(sh)
     if not sc: show_status("No skinCluster",True); return 0
     st=time.time()
     cmds.select(cl=True)
-    vc=cmds.polyEvaluate(sh,vertex=True); spa=SpatialIndex(); spa.build_from_shape(sh)
-    cf=[0]*vc; pv=[]
-    progress_start("Checking positions...",vc)
+    vc=cmds.polyEvaluate(sh,vertex=True)
+    jl=get_joint_list_from_sc(sc)
+    nj=len(jl)
+
+    # Bulk get positions
+    positions = _bulk_get_positions(sh, vc)
+    if not positions:
+        positions = []
+        for i in range(vc):
+            p = cmds.pointPosition("{0}.vtx[{1}]".format(sh, i), w=True)
+            positions.append((p[0], p[1], p[2]))
+
+    # Bulk get weights
+    all_weights = _bulk_get_weights(sc, sh, vc, nj)
+
+    # Round weights to 6 decimal places for comparison
+    def _weight_key(vi):
+        if all_weights:
+            wl = all_weights[vi]
+        else:
+            wl = cmds.skinPercent(sc, "{0}.vtx[{1}]".format(sh, vi), q=True, v=True)
+        return tuple(round(w, 6) for w in wl)
+
+    # Build spatial hash: bucket -> list of vertex indices
+    def _pos_key(p):
+        """Quantize position to 0.0005 grid for grouping same-position verts."""
+        return (int(round(p[0] * 2000)),
+                int(round(p[1] * 2000)),
+                int(round(p[2] * 2000)))
+
+    buckets = {}
     for i in range(vc):
-        progress_update(1,"Check {0}/{1}".format(i+1,vc))
-        if cf[i]: continue
-        cf[i]=1; pi=spa.vtx_positions[i]; cands=spa.get_cand_vtx(pi)
-        vg=["{0}.vtx[{1}]".format(sh,i)]
-        wi=",".join([str(w) for w in cmds.skinPercent(sc,vg[0],q=True,v=True)])
-        hit=False
-        for ci in cands:
-            if cf[ci]: continue
-            pc=spa.vtx_positions[ci]
-            if math.sqrt((pi[0]-pc[0])**2+(pi[1]-pc[1])**2+(pi[2]-pc[2])**2)<0.001:
-                cf[ci]=1; vc2="{0}.vtx[{1}]".format(sh,ci); vg.append(vc2)
-                wc=",".join([str(w) for w in cmds.skinPercent(sc,vc2,q=True,v=True)])
-                if wi!=wc: hit=True
-        if hit: pv.extend(vg)
+        bk = _pos_key(positions[i])
+        buckets.setdefault(bk, []).append(i)
+
+    # Check each bucket with 2+ verts
+    pv = []
+    progress_start("Checking positions...", len(buckets))
+    checked = 0
+    for bk, indices in buckets.items():
+        checked += 1
+        if checked % 500 == 0:
+            progress_update(min(500, len(buckets) - checked),
+                            "Check {0}/{1}".format(checked, len(buckets)))
+        if len(indices) < 2:
+            continue
+
+        # Group by exact same position (within 0.001)
+        groups = []
+        used = [False] * len(indices)
+        for a in range(len(indices)):
+            if used[a]:
+                continue
+            group = [indices[a]]
+            pa = positions[indices[a]]
+            for b in range(a + 1, len(indices)):
+                if used[b]:
+                    continue
+                pb = positions[indices[b]]
+                dist = math.sqrt((pa[0] - pb[0]) ** 2 +
+                                  (pa[1] - pb[1]) ** 2 +
+                                  (pa[2] - pb[2]) ** 2)
+                if dist < 0.001:
+                    group.append(indices[b])
+                    used[b] = True
+            used[a] = True
+            if len(group) >= 2:
+                groups.append(group)
+
+        # For each group, check if all verts have the same weight
+        for group in groups:
+            wkeys = set()
+            for vi in group:
+                wkeys.add(_weight_key(vi))
+            if len(wkeys) > 1:
+                for vi in group:
+                    pv.append("{0}.vtx[{1}]".format(sh, vi))
+
     progress_end()
-    elapsed=time.time()-st
-    if pv: cmds.select(pv,r=True); show_status("Found {0} problem vertices".format(len(pv)))
-    else: show_status("Check Pass - no same-position conflicts")
+    elapsed = time.time() - st
+    if pv:
+        cmds.select(pv, r=True)
+        show_status("Found {0} problem vertices".format(len(pv)))
+    else:
+        show_status("Check Pass - no same-position conflicts")
     show_check_result("Same Position Check", len(pv), vc,
                       "Time: {0:.2f}s".format(elapsed))
     return 1
