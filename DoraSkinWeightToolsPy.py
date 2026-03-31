@@ -2483,41 +2483,111 @@ def check_same_position():
 
 
 def _show_samepos_result(problem_groups):
-    """Show scrollable result window listing each problem group."""
+    """Show result window with group list + detail panel.
+    Selecting a group (click or arrow keys) selects its vertices in scene
+    and shows weight details in the lower panel."""
+    global _samepos_groups
+    _samepos_groups = problem_groups
+
     if cmds.window(_SAMEPOS_WIN, exists=True):
         cmds.deleteUI(_SAMEPOS_WIN)
     _title = "\u540c\u4f4d\u7f6e\u30a6\u30a7\u30a4\u30c8\u7d50\u679c" if _LANG == "ja" else "Same Position Result"
-    cmds.window(_SAMEPOS_WIN, title=_title, wh=(620, 450), s=True)
-    main_col = cmds.columnLayout(adj=True)
+    cmds.window(_SAMEPOS_WIN, title=_title, wh=(640, 500), s=True)
+    form = cmds.formLayout()
 
+    # Summary
     _summary = "{0} groups, {1} vertices".format(
         len(problem_groups),
         sum(len(g) for g in problem_groups))
-    cmds.text(label=_summary, h=24, fn="boldLabelFont", al="center")
-    cmds.separator(h=4, st="in")
+    summary_text = cmds.text(label=_summary, h=24, fn="boldLabelFont", al="center")
 
-    scroll = cmds.scrollLayout(h=380, cr=True)
-    cmds.columnLayout(adj=True)
+    sep1 = cmds.separator(h=4, st="in")
 
+    # Group list (top half)
+    _list_label = "\u30b0\u30eb\u30fc\u30d7\u4e00\u89a7" if _LANG == "ja" else "Groups"
+    list_lbl = cmds.text(label=_list_label, al="left", h=18, fn="smallPlainLabelFont")
+
+    group_list = cmds.textScrollList("DSWPy_SamePosGrpList", h=180, ams=False,
+                                      sc=lambda: _samepos_on_select(group_list, detail_field))
+
+    # Populate group list
     for gi, group in enumerate(problem_groups):
-        _grp_label = "--- Group {0} ({1} verts) ---".format(gi + 1, len(group))
-        cmds.text(label=_grp_label, al="left", h=20, fn="boldLabelFont")
+        vtx_names = [g[0].split("|")[-1] for g in group]
+        short_names = ", ".join([v.split(".")[-1] for v in vtx_names[:3]])
+        if len(vtx_names) > 3:
+            short_names += " +{0}".format(len(vtx_names) - 3)
+        label = "Group {0} ({1} verts): {2}".format(gi + 1, len(group), short_names)
+        cmds.textScrollList(group_list, e=True, a=label)
 
-        for vtx_name, weight_detail in group:
-            short = vtx_name.split("|")[-1]
-            row = cmds.rowLayout(nc=2, adj=2, h=20, cw=[(1, 220)])
-            cmds.text(label="  " + short, al="left", fn="smallPlainLabelFont")
-            cmds.text(label=weight_detail, al="left", fn="smallPlainLabelFont")
-            cmds.setParent("..")
+    sep2 = cmds.separator(h=4, st="in")
 
-        vtx_list = [g[0] for g in group]
-        _sel_label = "\u9078\u629e" if _LANG == "ja" else "Select"
-        cmds.button(label=_sel_label, h=20,
-                    c=lambda *a, vl=vtx_list: cmds.select(vl, r=True))
-        cmds.separator(h=4, st="in")
+    # Detail panel (bottom half)
+    _detail_label = "\u30a6\u30a7\u30a4\u30c8\u8a73\u7d30" if _LANG == "ja" else "Weight Detail"
+    detail_lbl = cmds.text(label=_detail_label, al="left", h=18, fn="smallPlainLabelFont")
+    detail_field = cmds.scrollField("DSWPy_SamePosDetail", h=180, ed=False, ww=True,
+                                      fn="fixedWidthFont", tx="")
 
-    cmds.setParent(main_col)
+    # Navigation hint
+    _hint = "\u4e0a\u4e0b\u30ad\u30fc\u3067\u30b0\u30eb\u30fc\u30d7\u5207\u66ff\u3001\u81ea\u52d5\u3067\u30b7\u30fc\u30f3\u9078\u629e" if _LANG == "ja" else "Use Up/Down keys to navigate, auto-selects in scene"
+    hint_text = cmds.text(label=_hint, al="center", h=16, fn="smallPlainLabelFont", en=False)
+
+    cmds.formLayout(form, e=True,
+        af=[(summary_text, "top", 4), (summary_text, "left", 4), (summary_text, "right", 4),
+            (sep1, "left", 0), (sep1, "right", 0),
+            (list_lbl, "left", 6),
+            (group_list, "left", 4), (group_list, "right", 4),
+            (sep2, "left", 0), (sep2, "right", 0),
+            (detail_lbl, "left", 6),
+            (detail_field, "left", 4), (detail_field, "right", 4),
+            (hint_text, "left", 4), (hint_text, "right", 4), (hint_text, "bottom", 4)],
+        ac=[(sep1, "top", 2, summary_text),
+            (list_lbl, "top", 2, sep1),
+            (group_list, "top", 2, list_lbl),
+            (sep2, "top", 4, group_list),
+            (detail_lbl, "top", 2, sep2),
+            (detail_field, "top", 2, detail_lbl),
+            (detail_field, "bottom", 4, hint_text)])
+
     cmds.showWindow(_SAMEPOS_WIN)
+
+    # Auto-select first group
+    if problem_groups:
+        cmds.textScrollList(group_list, e=True, sii=[1])
+        _samepos_on_select(group_list, detail_field)
+
+
+_samepos_groups = []
+
+def _samepos_on_select(group_list_ctrl, detail_ctrl):
+    """Called when group list selection changes."""
+    global _samepos_groups
+    idx_list = cmds.textScrollList(group_list_ctrl, q=True, sii=True) or []
+    if not idx_list:
+        return
+    gi = idx_list[0] - 1
+    if gi < 0 or gi >= len(_samepos_groups):
+        return
+
+    group = _samepos_groups[gi]
+
+    # Select vertices in scene
+    vtx_list = [g[0] for g in group]
+    try:
+        cmds.select(vtx_list, r=True)
+    except Exception:
+        pass
+
+    # Build detail text
+    lines = []
+    lines.append("=== Group {0} ({1} verts) ===".format(gi + 1, len(group)))
+    lines.append("")
+    for vtx_name, weight_detail in group:
+        short = vtx_name.split("|")[-1]
+        lines.append("{0}".format(short))
+        lines.append("  {0}".format(weight_detail))
+        lines.append("")
+
+    cmds.scrollField(detail_ctrl, e=True, tx="\n".join(lines))
 
 
 def check_influence_count(max_inf=4):
