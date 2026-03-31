@@ -2237,7 +2237,7 @@ def create_skin_joint_set():
     show_status("Created SkinJointSet for "+sl[0]); return 1
 
 def check_weight_digit(unit=0.01):
-    """Find vertices with weights finer than unit. Bulk-optimized via OpenMaya."""
+    """Find vertices with weights finer than unit."""
     max_places = _unit_to_places(unit)
     sl=cmds.filterExpand(sm=12) or []
     if not sl: show_status("No skinned mesh selected",True); return 0
@@ -2246,8 +2246,6 @@ def check_weight_digit(unit=0.01):
     st=time.time()
     jl=get_joint_list_from_sc(sc)
     vc=cmds.polyEvaluate(sh,vertex=True); sv=[]
-
-    # Bulk fetch weights
     all_weights = _bulk_get_weights(sc, sh, vc, len(jl))
     progress_start("Checking decimals...", vc)
     for i in range(vc):
@@ -2274,14 +2272,13 @@ def check_weight_digit(unit=0.01):
 
 
 def _unit_to_places(unit):
-    """Convert a unit value like 0.01 to number of decimal places (2)."""
     us = "{0:.10f}".format(unit).rstrip("0")
     mp = len(us.split(".")[1]) if "." in us else 0
     return max(mp, 1)
 
 
 def clean_weight_digit(unit=0.01):
-    """Round all skin weights to the specified unit and remove values below it."""
+    """Round all skin weights to the specified unit."""
     places = _unit_to_places(unit)
     sl=cmds.filterExpand(sm=12) or []
     if not sl: show_status("No skinned mesh selected",True); return 0
@@ -2323,13 +2320,13 @@ def clean_weight_digit(unit=0.01):
     elapsed=time.time()-st
     show_status("Cleaned {0}/{1} vertices (unit: {2})".format(fixed, vc, unit))
     cmds.confirmDialog(title="Weight Clean",
-                       message="Cleaned {0} / {1} vertices.\nUnit: {2}\nTime: {3:.2f}s".format(fixed, vc, unit, elapsed),
+                       message="Cleaned {0} / {1} vertices.\nUnit: {2}\nTime: {3:.2f}s".format(
+                           fixed, vc, unit, elapsed),
                        button=["OK"], icon="information")
     return 1
 
 
 def _quantize_weight_params(params, unit=0.01):
-    """Filter and round a transformValue list."""
     if not params or unit <= 0: return params
     places = _unit_to_places(unit)
     rounded = []
@@ -2348,13 +2345,62 @@ def _quantize_weight_params(params, unit=0.01):
     return rounded
 
 
-# ---- Same Position Check (v2: multi-mesh, sorted keys, result window) ----
+# ---- Same Position Check (v3: multi-mesh, edge-connected groups, result window) ----
 
 _SAMEPOS_WIN = "DSWPy_SamePosResult"
 
+def _build_edge_adjacency(shape, vtx_indices_set):
+    """Build adjacency dict for vertices in vtx_indices_set.
+    Returns {vtx_index: set of neighbor vtx_indices} using edge connectivity."""
+    adj = {}
+    for vi in vtx_indices_set:
+        adj[vi] = set()
+    try:
+        num_edges = cmds.polyEvaluate(shape, edge=True)
+        sel = om.MSelectionList()
+        sel.add(shape)
+        dp = om.MDagPath()
+        sel.getDagPath(0, dp)
+        it = om.MItMeshEdge(dp)
+        while not it.isDone():
+            v0 = it.index(0)
+            v1 = it.index(1)
+            if v0 in vtx_indices_set and v1 in vtx_indices_set:
+                adj[v0].add(v1)
+                adj[v1].add(v0)
+            it.next()
+    except Exception:
+        pass
+    return adj
+
+
+def _flood_fill_groups(adj, all_indices):
+    """Group connected vertices using flood fill.
+    Returns list of sets."""
+    visited = set()
+    groups = []
+    for start in all_indices:
+        if start in visited:
+            continue
+        group = set()
+        stack = [start]
+        while stack:
+            v = stack.pop()
+            if v in visited:
+                continue
+            visited.add(v)
+            group.add(v)
+            for nb in adj.get(v, []):
+                if nb not in visited:
+                    stack.append(nb)
+        if group:
+            groups.append(group)
+    return groups
+
+
 def check_same_position():
     """Find vertices at the same position with different weights.
-    Supports multiple meshes. Weight keys sorted by joint name."""
+    Multi-mesh support. Results grouped by edge connectivity."""
     sl = cmds.filterExpand(sm=12) or []
     if not sl:
         show_status("No skinned mesh selected", True)
@@ -2366,6 +2412,8 @@ def check_same_position():
     all_vtx_names = []
     all_weight_keys = []
     all_weight_details = []
+    all_mesh_shape = []  # shape name per vertex
+    all_local_idx = []   # local vtx index per vertex
     total_vc = 0
 
     for obj in sl:
@@ -2389,13 +2437,14 @@ def check_same_position():
         for i in range(vc):
             all_positions.append(positions[i])
             all_vtx_names.append("{0}.vtx[{1}]".format(sh, i))
+            all_mesh_shape.append(sh)
+            all_local_idx.append(i)
             if all_weights:
                 wk_raw = list(zip(jl, [round(w, 6) for w in all_weights[i]]))
             else:
                 wl = cmds.skinPercent(sc, "{0}.vtx[{1}]".format(sh, i),
                                        q=True, v=True)
                 wk_raw = list(zip(jl, [round(w, 6) for w in wl]))
-            # Sort by joint name so order-independent comparison
             filtered = tuple(sorted([(j, w) for j, w in wk_raw if w > 1e-6]))
             all_weight_keys.append(filtered)
             detail = ", ".join(["{0}:{1:.4f}".format(j, w)
@@ -2410,7 +2459,7 @@ def check_same_position():
         show_status("No skinned vertices found", True)
         return 0
 
-    # Spatial hash with 0.0005 precision
+    # Spatial hash
     def _pos_key(p):
         return (int(round(p[0] * 2000)),
                 int(round(p[1] * 2000)),
@@ -2421,8 +2470,8 @@ def check_same_position():
         bk = _pos_key(all_positions[i])
         buckets.setdefault(bk, []).append(i)
 
-    pv = []
-    problem_groups = []
+    # Find problem vertices (same position, different weights)
+    problem_vtx_set = set()  # global indices
     progress_start("Checking positions...", len(buckets))
     checked = 0
     for bk, indices in buckets.items():
@@ -2433,7 +2482,6 @@ def check_same_position():
         if len(indices) < 2:
             continue
 
-        # Group by exact same position (within 0.001)
         groups = []
         used = [False] * len(indices)
         for a in range(len(indices)):
@@ -2460,32 +2508,72 @@ def check_same_position():
             for vi in group:
                 wsets.add(all_weight_keys[vi])
             if len(wsets) > 1:
-                grp_info = []
                 for vi in group:
-                    pv.append(all_vtx_names[vi])
-                    grp_info.append((all_vtx_names[vi], all_weight_details[vi]))
-                problem_groups.append(grp_info)
+                    problem_vtx_set.add(vi)
 
     progress_end()
-    elapsed = time.time() - st
-    if pv:
-        cmds.select(pv, r=True)
-        show_status("Found {0} vertices in {1} groups".format(
-            len(pv), len(problem_groups)))
-    else:
+
+    if not problem_vtx_set:
+        elapsed = time.time() - st
         show_status("Check Pass - no same-position conflicts")
-    show_check_result("Same Position Check", len(pv), total_vc,
-                      "Meshes: {0}\nGroups: {1}\nTime: {2:.2f}s".format(
-                          len(sl), len(problem_groups), elapsed))
-    if problem_groups:
-        _show_samepos_result(problem_groups)
+        show_check_result("Same Position Check", 0, total_vc,
+                          "Meshes: {0}\nTime: {1:.2f}s".format(len(sl), elapsed))
+        return 1
+
+    # Build edge-connected groups per mesh shape
+    # Group problem vertices by shape first
+    shape_problem_verts = {}
+    for gi in problem_vtx_set:
+        sh = all_mesh_shape[gi]
+        li = all_local_idx[gi]
+        shape_problem_verts.setdefault(sh, set()).add(li)
+
+    # Build adjacency and flood-fill per shape
+    edge_groups = []  # list of lists of global indices
+    for sh, local_set in shape_problem_verts.items():
+        adj = _build_edge_adjacency(sh, local_set)
+        connected = _flood_fill_groups(adj, local_set)
+        # Map back to global indices
+        # Build local->global map for this shape
+        local_to_global = {}
+        for gi in problem_vtx_set:
+            if all_mesh_shape[gi] == sh:
+                local_to_global[all_local_idx[gi]] = gi
+        for conn_group in connected:
+            global_group = []
+            for li in conn_group:
+                if li in local_to_global:
+                    global_group.append(local_to_global[li])
+            if global_group:
+                edge_groups.append(sorted(global_group))
+
+    # Sort groups by size (largest first)
+    edge_groups.sort(key=lambda g: -len(g))
+
+    # Build display data
+    display_groups = []
+    all_pv = []
+    for group in edge_groups:
+        grp_info = []
+        for gi in group:
+            grp_info.append((all_vtx_names[gi], all_weight_details[gi]))
+            all_pv.append(all_vtx_names[gi])
+        display_groups.append(grp_info)
+
+    elapsed = time.time() - st
+    cmds.select(all_pv, r=True)
+    show_status("Found {0} vertices in {1} edge groups".format(
+        len(all_pv), len(display_groups)))
+    show_check_result("Same Position Check", len(all_pv), total_vc,
+                      "Meshes: {0}\nEdge groups: {1}\nTime: {2:.2f}s".format(
+                          len(sl), len(display_groups), elapsed))
+    if display_groups:
+        _show_samepos_result(display_groups)
     return 1
 
 
 def _show_samepos_result(problem_groups):
-    """Show result window with group list + detail panel.
-    Selecting a group (click or arrow keys) selects its vertices in scene
-    and shows weight details in the lower panel."""
+    """Show result window with edge-connected group list + detail panel."""
     global _samepos_groups
     _samepos_groups = problem_groups
 
@@ -2495,40 +2583,36 @@ def _show_samepos_result(problem_groups):
     cmds.window(_SAMEPOS_WIN, title=_title, wh=(640, 500), s=True)
     form = cmds.formLayout()
 
-    # Summary
-    _summary = "{0} groups, {1} vertices".format(
+    _summary = "{0} edge groups, {1} vertices".format(
         len(problem_groups),
         sum(len(g) for g in problem_groups))
     summary_text = cmds.text(label=_summary, h=24, fn="boldLabelFont", al="center")
-
     sep1 = cmds.separator(h=4, st="in")
 
-    # Group list (top half)
-    _list_label = "\u30b0\u30eb\u30fc\u30d7\u4e00\u89a7" if _LANG == "ja" else "Groups"
+    _list_label = "\u30b0\u30eb\u30fc\u30d7\u4e00\u89a7 (\u4e0a\u4e0b\u30ad\u30fc\u3067\u5207\u66ff)" if _LANG == "ja" else "Groups (Up/Down to navigate)"
     list_lbl = cmds.text(label=_list_label, al="left", h=18, fn="smallPlainLabelFont")
 
     group_list = cmds.textScrollList("DSWPy_SamePosGrpList", h=180, ams=False,
                                       sc=lambda: _samepos_on_select(group_list, detail_field))
 
-    # Populate group list
     for gi, group in enumerate(problem_groups):
         vtx_names = [g[0].split("|")[-1] for g in group]
-        short_names = ", ".join([v.split(".")[-1] for v in vtx_names[:3]])
-        if len(vtx_names) > 3:
-            short_names += " +{0}".format(len(vtx_names) - 3)
-        label = "Group {0} ({1} verts): {2}".format(gi + 1, len(group), short_names)
+        # Show mesh name + vertex count
+        meshes = set()
+        for vn in vtx_names:
+            meshes.add(vn.split(".")[0])
+        mesh_str = ", ".join(sorted(meshes))
+        label = "Group {0} ({1} verts) [{2}]".format(gi + 1, len(group), mesh_str)
         cmds.textScrollList(group_list, e=True, a=label)
 
     sep2 = cmds.separator(h=4, st="in")
 
-    # Detail panel (bottom half)
     _detail_label = "\u30a6\u30a7\u30a4\u30c8\u8a73\u7d30" if _LANG == "ja" else "Weight Detail"
     detail_lbl = cmds.text(label=_detail_label, al="left", h=18, fn="smallPlainLabelFont")
     detail_field = cmds.scrollField("DSWPy_SamePosDetail", h=180, ed=False, ww=True,
                                       fn="fixedWidthFont", tx="")
 
-    # Navigation hint
-    _hint = "\u4e0a\u4e0b\u30ad\u30fc\u3067\u30b0\u30eb\u30fc\u30d7\u5207\u66ff\u3001\u81ea\u52d5\u3067\u30b7\u30fc\u30f3\u9078\u629e" if _LANG == "ja" else "Use Up/Down keys to navigate, auto-selects in scene"
+    _hint = "\u4e0a\u4e0b\u30ad\u30fc\u3067\u30b0\u30eb\u30fc\u30d7\u5207\u66ff\u3001\u81ea\u52d5\u3067\u30b7\u30fc\u30f3\u9078\u629e" if _LANG == "ja" else "Up/Down keys to navigate, auto-selects in scene"
     hint_text = cmds.text(label=_hint, al="center", h=16, fn="smallPlainLabelFont", en=False)
 
     cmds.formLayout(form, e=True,
@@ -2550,7 +2634,6 @@ def _show_samepos_result(problem_groups):
 
     cmds.showWindow(_SAMEPOS_WIN)
 
-    # Auto-select first group
     if problem_groups:
         cmds.textScrollList(group_list, e=True, sii=[1])
         _samepos_on_select(group_list, detail_field)
@@ -2569,15 +2652,12 @@ def _samepos_on_select(group_list_ctrl, detail_ctrl):
         return
 
     group = _samepos_groups[gi]
-
-    # Select vertices in scene
     vtx_list = [g[0] for g in group]
     try:
         cmds.select(vtx_list, r=True)
     except Exception:
         pass
 
-    # Build detail text
     lines = []
     lines.append("=== Group {0} ({1} verts) ===".format(gi + 1, len(group)))
     lines.append("")
@@ -2599,7 +2679,6 @@ def check_influence_count(max_inf=4):
     st=time.time()
     jl=get_joint_list_from_sc(sc)
     vc=cmds.polyEvaluate(sh,vertex=True); sv=[]
-
     all_weights = _bulk_get_weights(sc, sh, vc, len(jl))
     progress_start("Checking influences...", vc)
     for i in range(vc):
@@ -2624,43 +2703,84 @@ def check_influence_count(max_inf=4):
     return 1
 
 
-# ---- Update Checker ----
+# ---- Update Checker (v2: GitHub API, SSL fallback) ----
 
-_UPDATE_URL = "https://raw.githubusercontent.com/Kiasejapan/SkinWeightToolsPy/main/DoraSkinWeightToolsPy.py"
-_DOWNLOAD_URL = "https://github.com/Kiasejapan/SkinWeightToolsPy/raw/refs/heads/main/DoraSkinWeightToolsPy.py"
+_GITHUB_API_URL = "https://api.github.com/repos/Kiasejapan/SkinWeightToolsPy/contents/DoraSkinWeightToolsPy.py"
+_GITHUB_RAW_URL = "https://raw.githubusercontent.com/Kiasejapan/SkinWeightToolsPy/main/DoraSkinWeightToolsPy.py"
+
+def _url_read(url, max_bytes=0, timeout=15):
+    """Read URL content. Handles PY2/PY3 and SSL issues."""
+    if PY2:
+        import urllib2
+        try:
+            import ssl
+            ctx = ssl.create_default_context()
+        except Exception:
+            ctx = None
+        try:
+            if ctx:
+                resp = urllib2.urlopen(url, timeout=timeout, context=ctx)
+            else:
+                resp = urllib2.urlopen(url, timeout=timeout)
+        except Exception:
+            # Fallback: skip SSL verification
+            try:
+                import ssl
+                ctx2 = ssl._create_unverified_context()
+                resp = urllib2.urlopen(url, timeout=timeout, context=ctx2)
+            except Exception:
+                resp = urllib2.urlopen(url, timeout=timeout)
+        data = resp.read(max_bytes) if max_bytes else resp.read()
+        if isinstance(data, bytes):
+            data = data.decode("utf-8", errors="replace")
+        return data
+    else:
+        import urllib.request
+        import ssl
+        try:
+            ctx = ssl.create_default_context()
+            resp = urllib.request.urlopen(url, timeout=timeout, context=ctx)
+        except Exception:
+            try:
+                ctx2 = ssl._create_unverified_context()
+                resp = urllib.request.urlopen(url, timeout=timeout, context=ctx2)
+            except Exception:
+                resp = urllib.request.urlopen(url, timeout=timeout)
+        data = resp.read(max_bytes) if max_bytes else resp.read()
+        if isinstance(data, bytes):
+            data = data.decode("utf-8", errors="replace")
+        return data
+
+
+def _extract_remote_version(text):
+    """Extract VERSION = "x.y.z" from Python source text."""
+    for line in text.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("VERSION") and "=" in stripped:
+            parts = stripped.split("=", 1)
+            ver = parts[1].strip().strip("\"'").strip()
+            if ver:
+                return ver
+    return ""
+
 
 def check_for_update():
     """Check GitHub for newer version and offer to download."""
+    show_status("Checking for updates...")
+
+    # Read first 3000 bytes to find VERSION line
     try:
-        if PY2:
-            import urllib2
-            response = urllib2.urlopen(_UPDATE_URL, timeout=10)
-            first_lines = response.read(2000)
-            if isinstance(first_lines, bytes):
-                first_lines = first_lines.decode("utf-8", errors="replace")
-        else:
-            import urllib.request
-            req = urllib.request.Request(_UPDATE_URL)
-            response = urllib.request.urlopen(req, timeout=10)
-            first_lines = response.read(2000).decode("utf-8", errors="replace")
+        first_chunk = _url_read(_GITHUB_RAW_URL, max_bytes=3000)
     except Exception as e:
         cmds.confirmDialog(title="Update Check",
                            message="Could not connect to GitHub.\n{0}".format(e),
                            button=["OK"], icon="warning")
         return
 
-    # Extract VERSION from remote file
-    remote_ver = ""
-    for line in first_lines.split("\n"):
-        if line.strip().startswith("VERSION"):
-            parts = line.split("=")
-            if len(parts) >= 2:
-                remote_ver = parts[1].strip().strip("\"'")
-                break
-
+    remote_ver = _extract_remote_version(first_chunk)
     if not remote_ver:
         cmds.confirmDialog(title="Update Check",
-                           message="Could not determine remote version.",
+                           message="Could not determine remote version.\nCheck your internet connection.",
                            button=["OK"], icon="warning")
         return
 
@@ -2668,12 +2788,12 @@ def check_for_update():
 
     if remote_ver == local_ver:
         cmds.confirmDialog(title="Update Check",
-                           message="You are up to date.\nVersion: {0}".format(local_ver),
+                           message="You are up to date!\nVersion: {0}".format(local_ver),
                            button=["OK"], icon="information")
+        show_status("Up to date: v{0}".format(local_ver))
         return
 
-    # Newer version available
-    _msg = "New version available!\n\nLocal:  {0}\nRemote: {1}\n\nDownload and update?".format(
+    _msg = "New version available!\n\nLocal:  {0}\nRemote: {1}\n\nDownload and install?".format(
         local_ver, remote_ver)
     result = cmds.confirmDialog(title="Update Check", message=_msg,
                                  button=["Download", "Cancel"],
@@ -2682,20 +2802,22 @@ def check_for_update():
     if result != "Download":
         return
 
-    # Download to Maya scripts folder
+    # Download full file
     try:
-        scripts_dir = os.path.join(
-            cmds.internalVar(userScriptDir=True))
-        dest = os.path.join(scripts_dir, "DoraSkinWeightToolsPy.py")
+        show_status("Downloading v{0}...".format(remote_ver))
+        full_data = _url_read(_GITHUB_RAW_URL)
+    except Exception as e:
+        cmds.confirmDialog(title="Update Check",
+                           message="Download failed.\n{0}".format(e),
+                           button=["OK"], icon="warning")
+        return
 
-        if PY2:
-            import urllib2
-            resp = urllib2.urlopen(_DOWNLOAD_URL, timeout=30)
-            data = resp.read()
-        else:
-            import urllib.request
-            resp = urllib.request.urlopen(_DOWNLOAD_URL, timeout=30)
-            data = resp.read()
+    # Save to Maya scripts folder
+    try:
+        scripts_dir = cmds.internalVar(userScriptDir=True)
+        if scripts_dir.endswith("/") or scripts_dir.endswith("\\"):
+            scripts_dir = scripts_dir[:-1]
+        dest = os.path.join(scripts_dir, "DoraSkinWeightToolsPy.py")
 
         # Backup existing
         if os.path.exists(dest):
@@ -2704,16 +2826,22 @@ def check_for_update():
                 os.remove(bak)
             os.rename(dest, bak)
 
-        with open(dest, "wb") as f:
-            f.write(data)
+        if PY2:
+            with open(dest, "wb") as f:
+                f.write(full_data.encode("utf-8"))
+        else:
+            with open(dest, "w", encoding="utf-8") as f:
+                f.write(full_data)
 
+        _done_msg = "Updated to v{0}!\n\nSaved: {1}\n\nReload with:\nimport importlib\nimport DoraSkinWeightToolsPy\nimportlib.reload(DoraSkinWeightToolsPy)\nDoraSkinWeightToolsPy.launch()".format(
+            remote_ver, dest)
         cmds.confirmDialog(title="Update Check",
-                           message="Updated to {0}!\nSaved: {1}\n\nPlease reload:\nimport importlib\nimportlib.reload(DoraSkinWeightToolsPy)".format(
-                               remote_ver, dest),
+                           message=_done_msg,
                            button=["OK"], icon="information")
+        show_status("Updated to v{0}".format(remote_ver))
     except Exception as e:
         cmds.confirmDialog(title="Update Check",
-                           message="Download failed.\n{0}".format(e),
+                           message="Save failed.\n{0}".format(e),
                            button=["OK"], icon="warning")
 # ============================================================================
 # DSW List
