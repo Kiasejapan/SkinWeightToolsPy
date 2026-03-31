@@ -2322,14 +2322,14 @@ def clean_weight_digit(unit=0.01):
     progress_end()
     elapsed=time.time()-st
     show_status("Cleaned {0}/{1} vertices (unit: {2})".format(fixed, vc, unit))
-    cmds.confirmDialog(title="Weight Clean", 
+    cmds.confirmDialog(title="Weight Clean",
                        message="Cleaned {0} / {1} vertices.\nUnit: {2}\nTime: {3:.2f}s".format(fixed, vc, unit, elapsed),
                        button=["OK"], icon="information")
     return 1
 
 
 def _quantize_weight_params(params, unit=0.01):
-    """Filter and round a transformValue list. Weights below unit become 0, then re-normalize."""
+    """Filter and round a transformValue list."""
     if not params or unit <= 0: return params
     places = _unit_to_places(unit)
     rounded = []
@@ -2340,7 +2340,6 @@ def _quantize_weight_params(params, unit=0.01):
     total = sum(w for _, w in rounded)
     if total > 0:
         rounded = [(j, round(w / total, places)) for j, w in rounded]
-        # Fix rounding drift
         diff = 1.0 - sum(w for _, w in rounded)
         if abs(diff) > 1e-12:
             max_i = max(range(len(rounded)), key=lambda i: rounded[i][1])
@@ -2348,21 +2347,25 @@ def _quantize_weight_params(params, unit=0.01):
             rounded[max_i] = (j, round(w + diff, places))
     return rounded
 
+
+# ---- Same Position Check (v2: multi-mesh, sorted keys, result window) ----
+
+_SAMEPOS_WIN = "DSWPy_SamePosResult"
+
 def check_same_position():
     """Find vertices at the same position with different weights.
-    Supports multiple selected meshes — compares across all of them.
-    Uses bulk OpenMaya API for positions and weights."""
-    sl=cmds.filterExpand(sm=12) or []
-    if not sl: show_status("No skinned mesh selected",True); return 0
-    st=time.time()
+    Supports multiple meshes. Weight keys sorted by joint name."""
+    sl = cmds.filterExpand(sm=12) or []
+    if not sl:
+        show_status("No skinned mesh selected", True)
+        return 0
+    st = time.time()
     cmds.select(cl=True)
 
-    # Collect all vertex data from all selected meshes
-    # Each entry: (mesh_shape, skinCluster, joint_list, positions, weights, vtx_offset)
-    mesh_data = []
-    all_positions = []  # flat list of (x,y,z)
-    all_vtx_names = []  # flat list of "shape.vtx[i]"
-    all_weight_keys = []  # flat list of rounded weight tuples
+    all_positions = []
+    all_vtx_names = []
+    all_weight_keys = []
+    all_weight_details = []
     total_vc = 0
 
     for obj in sl:
@@ -2387,12 +2390,19 @@ def check_same_position():
             all_positions.append(positions[i])
             all_vtx_names.append("{0}.vtx[{1}]".format(sh, i))
             if all_weights:
-                wk = tuple(round(w, 6) for w in all_weights[i])
+                wk_raw = list(zip(jl, [round(w, 6) for w in all_weights[i]]))
             else:
-                wl = cmds.skinPercent(sc, "{0}.vtx[{1}]".format(sh, i), q=True, v=True)
-                wk = tuple(round(w, 6) for w in wl)
-            # Prefix joint names to weight key so different skeletons compare correctly
-            all_weight_keys.append(tuple(zip(jl, wk)))
+                wl = cmds.skinPercent(sc, "{0}.vtx[{1}]".format(sh, i),
+                                       q=True, v=True)
+                wk_raw = list(zip(jl, [round(w, 6) for w in wl]))
+            # Sort by joint name so order-independent comparison
+            filtered = tuple(sorted([(j, w) for j, w in wk_raw if w > 1e-6]))
+            all_weight_keys.append(filtered)
+            detail = ", ".join(["{0}:{1:.4f}".format(j, w)
+                                 for j, w in filtered[:5]])
+            if len(filtered) > 5:
+                detail += " (+{0})".format(len(filtered) - 5)
+            all_weight_details.append(detail)
 
         total_vc += vc
 
@@ -2400,7 +2410,7 @@ def check_same_position():
         show_status("No skinned vertices found", True)
         return 0
 
-    # Build spatial hash
+    # Spatial hash with 0.0005 precision
     def _pos_key(p):
         return (int(round(p[0] * 2000)),
                 int(round(p[1] * 2000)),
@@ -2411,8 +2421,8 @@ def check_same_position():
         bk = _pos_key(all_positions[i])
         buckets.setdefault(bk, []).append(i)
 
-    # Check each bucket
     pv = []
+    problem_groups = []
     progress_start("Checking positions...", len(buckets))
     checked = 0
     for bk, indices in buckets.items():
@@ -2445,33 +2455,73 @@ def check_same_position():
             if len(group) >= 2:
                 groups.append(group)
 
-        # For each group, compare weights (joint_name, weight) pairs
         for group in groups:
-            # Collect unique weight patterns (as sets of (joint, weight) with w > 0)
             wsets = set()
             for vi in group:
-                wk = all_weight_keys[vi]
-                # Only include non-zero weights for comparison
-                filtered = tuple((j, w) for j, w in wk if w > 1e-6)
-                wsets.add(filtered)
+                wsets.add(all_weight_keys[vi])
             if len(wsets) > 1:
+                grp_info = []
                 for vi in group:
                     pv.append(all_vtx_names[vi])
+                    grp_info.append((all_vtx_names[vi], all_weight_details[vi]))
+                problem_groups.append(grp_info)
 
     progress_end()
     elapsed = time.time() - st
     if pv:
         cmds.select(pv, r=True)
-        show_status("Found {0} problem vertices".format(len(pv)))
+        show_status("Found {0} vertices in {1} groups".format(
+            len(pv), len(problem_groups)))
     else:
         show_status("Check Pass - no same-position conflicts")
     show_check_result("Same Position Check", len(pv), total_vc,
-                      "Meshes: {0}\nTime: {1:.2f}s".format(len(sl), elapsed))
+                      "Meshes: {0}\nGroups: {1}\nTime: {2:.2f}s".format(
+                          len(sl), len(problem_groups), elapsed))
+    if problem_groups:
+        _show_samepos_result(problem_groups)
     return 1
 
 
+def _show_samepos_result(problem_groups):
+    """Show scrollable result window listing each problem group."""
+    if cmds.window(_SAMEPOS_WIN, exists=True):
+        cmds.deleteUI(_SAMEPOS_WIN)
+    _title = "\u540c\u4f4d\u7f6e\u30a6\u30a7\u30a4\u30c8\u7d50\u679c" if _LANG == "ja" else "Same Position Result"
+    cmds.window(_SAMEPOS_WIN, title=_title, wh=(620, 450), s=True)
+    main_col = cmds.columnLayout(adj=True)
+
+    _summary = "{0} groups, {1} vertices".format(
+        len(problem_groups),
+        sum(len(g) for g in problem_groups))
+    cmds.text(label=_summary, h=24, fn="boldLabelFont", al="center")
+    cmds.separator(h=4, st="in")
+
+    scroll = cmds.scrollLayout(h=380, cr=True)
+    cmds.columnLayout(adj=True)
+
+    for gi, group in enumerate(problem_groups):
+        _grp_label = "--- Group {0} ({1} verts) ---".format(gi + 1, len(group))
+        cmds.text(label=_grp_label, al="left", h=20, fn="boldLabelFont")
+
+        for vtx_name, weight_detail in group:
+            short = vtx_name.split("|")[-1]
+            row = cmds.rowLayout(nc=2, adj=2, h=20, cw=[(1, 220)])
+            cmds.text(label="  " + short, al="left", fn="smallPlainLabelFont")
+            cmds.text(label=weight_detail, al="left", fn="smallPlainLabelFont")
+            cmds.setParent("..")
+
+        vtx_list = [g[0] for g in group]
+        _sel_label = "\u9078\u629e" if _LANG == "ja" else "Select"
+        cmds.button(label=_sel_label, h=20,
+                    c=lambda *a, vl=vtx_list: cmds.select(vl, r=True))
+        cmds.separator(h=4, st="in")
+
+    cmds.setParent(main_col)
+    cmds.showWindow(_SAMEPOS_WIN)
+
+
 def check_influence_count(max_inf=4):
-    """Find vertices influenced by more than max_inf joints. Bulk-optimized via OpenMaya."""
+    """Find vertices influenced by more than max_inf joints."""
     sl=cmds.filterExpand(sm=12) or []
     if not sl: show_status("No skinned mesh selected",True); return 0
     sh=get_shape(sl[0]); sc=get_skin_cluster(sh)
@@ -2504,6 +2554,97 @@ def check_influence_count(max_inf=4):
     return 1
 
 
+# ---- Update Checker ----
+
+_UPDATE_URL = "https://raw.githubusercontent.com/Kiasejapan/SkinWeightToolsPy/main/DoraSkinWeightToolsPy.py"
+_DOWNLOAD_URL = "https://github.com/Kiasejapan/SkinWeightToolsPy/raw/refs/heads/main/DoraSkinWeightToolsPy.py"
+
+def check_for_update():
+    """Check GitHub for newer version and offer to download."""
+    try:
+        if PY2:
+            import urllib2
+            response = urllib2.urlopen(_UPDATE_URL, timeout=10)
+            first_lines = response.read(2000)
+            if isinstance(first_lines, bytes):
+                first_lines = first_lines.decode("utf-8", errors="replace")
+        else:
+            import urllib.request
+            req = urllib.request.Request(_UPDATE_URL)
+            response = urllib.request.urlopen(req, timeout=10)
+            first_lines = response.read(2000).decode("utf-8", errors="replace")
+    except Exception as e:
+        cmds.confirmDialog(title="Update Check",
+                           message="Could not connect to GitHub.\n{0}".format(e),
+                           button=["OK"], icon="warning")
+        return
+
+    # Extract VERSION from remote file
+    remote_ver = ""
+    for line in first_lines.split("\n"):
+        if line.strip().startswith("VERSION"):
+            parts = line.split("=")
+            if len(parts) >= 2:
+                remote_ver = parts[1].strip().strip("\"'")
+                break
+
+    if not remote_ver:
+        cmds.confirmDialog(title="Update Check",
+                           message="Could not determine remote version.",
+                           button=["OK"], icon="warning")
+        return
+
+    local_ver = VERSION
+
+    if remote_ver == local_ver:
+        cmds.confirmDialog(title="Update Check",
+                           message="You are up to date.\nVersion: {0}".format(local_ver),
+                           button=["OK"], icon="information")
+        return
+
+    # Newer version available
+    _msg = "New version available!\n\nLocal:  {0}\nRemote: {1}\n\nDownload and update?".format(
+        local_ver, remote_ver)
+    result = cmds.confirmDialog(title="Update Check", message=_msg,
+                                 button=["Download", "Cancel"],
+                                 defaultButton="Download",
+                                 cancelButton="Cancel", icon="question")
+    if result != "Download":
+        return
+
+    # Download to Maya scripts folder
+    try:
+        scripts_dir = os.path.join(
+            cmds.internalVar(userScriptDir=True))
+        dest = os.path.join(scripts_dir, "DoraSkinWeightToolsPy.py")
+
+        if PY2:
+            import urllib2
+            resp = urllib2.urlopen(_DOWNLOAD_URL, timeout=30)
+            data = resp.read()
+        else:
+            import urllib.request
+            resp = urllib.request.urlopen(_DOWNLOAD_URL, timeout=30)
+            data = resp.read()
+
+        # Backup existing
+        if os.path.exists(dest):
+            bak = dest + ".bak"
+            if os.path.exists(bak):
+                os.remove(bak)
+            os.rename(dest, bak)
+
+        with open(dest, "wb") as f:
+            f.write(data)
+
+        cmds.confirmDialog(title="Update Check",
+                           message="Updated to {0}!\nSaved: {1}\n\nPlease reload:\nimport importlib\nimportlib.reload(DoraSkinWeightToolsPy)".format(
+                               remote_ver, dest),
+                           button=["OK"], icon="information")
+    except Exception as e:
+        cmds.confirmDialog(title="Update Check",
+                           message="Download failed.\n{0}".format(e),
+                           button=["OK"], icon="warning")
 # ============================================================================
 # DSW List
 # ============================================================================
@@ -2546,14 +2687,16 @@ class DoraSkinWeightUI(object):
         root=cmds.columnLayout(adj=True)
 
         # === Header ===
-        cmds.rowLayout(nc=4, adj=2, h=30, bgc=(0.22,0.22,0.22),
-                       cat=[(1,'left',6),(3,'right',4),(4,'right',6)], cw=[(1,100),(3,80),(4,80)])
+        cmds.rowLayout(nc=5, adj=2, h=30, bgc=(0.22,0.22,0.22),
+                       cat=[(1,'left',6),(3,'right',4),(4,'right',4),(5,'right',6)],
+                       cw=[(1,100),(3,60),(4,80),(5,80)])
         cmds.text(label=tr("lang_label"), fn="smallPlainLabelFont")
         self.lang_menu=cmds.optionMenu(h=22,w=80,cc=self._on_lang)
         cmds.menuItem(label="English"); cmds.menuItem(label="\u65e5\u672c\u8a9e")
         if _LANG=="ja": cmds.optionMenu(self.lang_menu,e=True,sl=2)
-        cmds.text(label="")
+        cmds.button(label="Update",h=22,w=60,c=lambda*a:check_for_update())
         cmds.button(label=tr("how_to_use"),h=22,w=80,c=lambda*a:self._htu())
+        cmds.text(label="")
         cmds.setParent(root)
 
         # === Status bar ===
