@@ -125,50 +125,68 @@ def _quantize_weight_params(params, unit=0.01):
 
 def check_same_position():
     """Find vertices at the same position with different weights.
-    Uses bulk OpenMaya API for positions and weights, with rounded
-    weight comparison to avoid false positives from float precision."""
+    Supports multiple selected meshes — compares across all of them.
+    Uses bulk OpenMaya API for positions and weights."""
     sl=cmds.filterExpand(sm=12) or []
     if not sl: show_status("No skinned mesh selected",True); return 0
-    sh=get_shape(sl[0]); sc=get_skin_cluster(sh)
-    if not sc: show_status("No skinCluster",True); return 0
     st=time.time()
     cmds.select(cl=True)
-    vc=cmds.polyEvaluate(sh,vertex=True)
-    jl=get_joint_list_from_sc(sc)
-    nj=len(jl)
 
-    # Bulk get positions
-    positions = _bulk_get_positions(sh, vc)
-    if not positions:
-        positions = []
+    # Collect all vertex data from all selected meshes
+    # Each entry: (mesh_shape, skinCluster, joint_list, positions, weights, vtx_offset)
+    mesh_data = []
+    all_positions = []  # flat list of (x,y,z)
+    all_vtx_names = []  # flat list of "shape.vtx[i]"
+    all_weight_keys = []  # flat list of rounded weight tuples
+    total_vc = 0
+
+    for obj in sl:
+        sh = get_shape(obj)
+        sc = get_skin_cluster(sh) if sh else ""
+        if not sc:
+            continue
+        jl = get_joint_list_from_sc(sc)
+        nj = len(jl)
+        vc = cmds.polyEvaluate(sh, vertex=True)
+
+        positions = _bulk_get_positions(sh, vc)
+        if not positions:
+            positions = []
+            for i in range(vc):
+                p = cmds.pointPosition("{0}.vtx[{1}]".format(sh, i), w=True)
+                positions.append((p[0], p[1], p[2]))
+
+        all_weights = _bulk_get_weights(sc, sh, vc, nj)
+
         for i in range(vc):
-            p = cmds.pointPosition("{0}.vtx[{1}]".format(sh, i), w=True)
-            positions.append((p[0], p[1], p[2]))
+            all_positions.append(positions[i])
+            all_vtx_names.append("{0}.vtx[{1}]".format(sh, i))
+            if all_weights:
+                wk = tuple(round(w, 6) for w in all_weights[i])
+            else:
+                wl = cmds.skinPercent(sc, "{0}.vtx[{1}]".format(sh, i), q=True, v=True)
+                wk = tuple(round(w, 6) for w in wl)
+            # Prefix joint names to weight key so different skeletons compare correctly
+            all_weight_keys.append(tuple(zip(jl, wk)))
 
-    # Bulk get weights
-    all_weights = _bulk_get_weights(sc, sh, vc, nj)
+        total_vc += vc
 
-    # Round weights to 6 decimal places for comparison
-    def _weight_key(vi):
-        if all_weights:
-            wl = all_weights[vi]
-        else:
-            wl = cmds.skinPercent(sc, "{0}.vtx[{1}]".format(sh, vi), q=True, v=True)
-        return tuple(round(w, 6) for w in wl)
+    if total_vc == 0:
+        show_status("No skinned vertices found", True)
+        return 0
 
-    # Build spatial hash: bucket -> list of vertex indices
+    # Build spatial hash
     def _pos_key(p):
-        """Quantize position to 0.0005 grid for grouping same-position verts."""
         return (int(round(p[0] * 2000)),
                 int(round(p[1] * 2000)),
                 int(round(p[2] * 2000)))
 
     buckets = {}
-    for i in range(vc):
-        bk = _pos_key(positions[i])
+    for i in range(len(all_positions)):
+        bk = _pos_key(all_positions[i])
         buckets.setdefault(bk, []).append(i)
 
-    # Check each bucket with 2+ verts
+    # Check each bucket
     pv = []
     progress_start("Checking positions...", len(buckets))
     checked = 0
@@ -187,11 +205,11 @@ def check_same_position():
             if used[a]:
                 continue
             group = [indices[a]]
-            pa = positions[indices[a]]
+            pa = all_positions[indices[a]]
             for b in range(a + 1, len(indices)):
                 if used[b]:
                     continue
-                pb = positions[indices[b]]
+                pb = all_positions[indices[b]]
                 dist = math.sqrt((pa[0] - pb[0]) ** 2 +
                                   (pa[1] - pb[1]) ** 2 +
                                   (pa[2] - pb[2]) ** 2)
@@ -202,14 +220,18 @@ def check_same_position():
             if len(group) >= 2:
                 groups.append(group)
 
-        # For each group, check if all verts have the same weight
+        # For each group, compare weights (joint_name, weight) pairs
         for group in groups:
-            wkeys = set()
+            # Collect unique weight patterns (as sets of (joint, weight) with w > 0)
+            wsets = set()
             for vi in group:
-                wkeys.add(_weight_key(vi))
-            if len(wkeys) > 1:
+                wk = all_weight_keys[vi]
+                # Only include non-zero weights for comparison
+                filtered = tuple((j, w) for j, w in wk if w > 1e-6)
+                wsets.add(filtered)
+            if len(wsets) > 1:
                 for vi in group:
-                    pv.append("{0}.vtx[{1}]".format(sh, vi))
+                    pv.append(all_vtx_names[vi])
 
     progress_end()
     elapsed = time.time() - st
@@ -218,8 +240,8 @@ def check_same_position():
         show_status("Found {0} problem vertices".format(len(pv)))
     else:
         show_status("Check Pass - no same-position conflicts")
-    show_check_result("Same Position Check", len(pv), vc,
-                      "Time: {0:.2f}s".format(elapsed))
+    show_check_result("Same Position Check", len(pv), total_vc,
+                      "Meshes: {0}\nTime: {1:.2f}s".format(len(sl), elapsed))
     return 1
 
 
