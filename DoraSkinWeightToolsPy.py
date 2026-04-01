@@ -19,7 +19,7 @@ import maya.mel as mel
 import maya.OpenMaya as om
 import maya.OpenMayaAnim as oma
 
-VERSION = "4.2.0.__BUILD_STAMP__"
+VERSION = "4.2.0.260401.1740"
 DSW_FORMAT_HEADER = "DoraYuki Skin Weight Format 3.00"
 
 # ============================================================================

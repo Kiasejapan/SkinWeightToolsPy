@@ -6,7 +6,7 @@ _build/ 内で実行される前提。
 
 使い方:
     python build.py              # 通常ビルド
-    python build.py --no-stamp   # リリース日スタンプをスキップ
+    python build.py --no-stamp   # リリース日スタンプをスキップ (VERSIONは常に更新)
 """
 from __future__ import print_function
 import os
@@ -15,7 +15,7 @@ import sys
 import glob
 import shutil
 import py_compile
-from datetime import date
+from datetime import datetime
 
 # === 設定 ===
 OUT = "DoraSkinWeightToolsPy.py"
@@ -56,9 +56,15 @@ def main():
     merged = "".join(combined)
     print("[INFO] {} files merged.".format(len(src_files)))
 
-    # --- リリース日スタンプ ---
+    # --- ビルドタイムスタンプ (常に更新) ---
+    now = datetime.now()
+    build_stamp = now.strftime("%y%m%d.%H%M")
+    merged = merged.replace("__BUILD_STAMP__", build_stamp)
+    print("[INFO] Build stamp: {}".format(build_stamp))
+
+    # --- リリース日スタンプ (オプション) ---
     if not no_stamp:
-        stamp = date.today().isoformat()
+        stamp = now.strftime("%Y-%m-%d")
         merged = re.sub(
             r'(__RELEASE_DATE__\s*=\s*[\'"]).*?([\'"])',
             r'\g<1>{}\2'.format(stamp),
