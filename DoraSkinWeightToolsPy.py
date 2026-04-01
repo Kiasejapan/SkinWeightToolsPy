@@ -2237,37 +2237,36 @@ def create_skin_joint_set():
     show_status("Created SkinJointSet for "+sl[0]); return 1
 
 def check_weight_digit(unit=0.01):
-    """Find vertices with weights finer than unit."""
+    """Find vertices with weights finer than unit. Multi-mesh support."""
     max_places = _unit_to_places(unit)
     sl=cmds.filterExpand(sm=12) or []
     if not sl: show_status("No skinned mesh selected",True); return 0
-    sh=get_shape(sl[0]); sc=get_skin_cluster(sh)
-    if not sc: show_status("No skinCluster",True); return 0
     st=time.time()
-    jl=get_joint_list_from_sc(sc)
-    vc=cmds.polyEvaluate(sh,vertex=True); sv=[]
-    all_weights = _bulk_get_weights(sc, sh, vc, len(jl))
-    progress_start("Checking decimals...", vc)
-    for i in range(vc):
-        if i % 1000 == 0:
-            progress_update(min(1000, vc - i), "Check {0}/{1}".format(i, vc))
-        if all_weights:
-            wl = all_weights[i]
-        else:
-            wl = cmds.skinPercent(sc, "{0}.vtx[{1}]".format(sh,i), q=True, v=True)
-        for w in wl:
-            ws = "{0:.10f}".format(w).rstrip("0")
-            if "." in ws and len(ws.split(".")[1]) > max_places:
-                sv.append("{0}.vtx[{1}]".format(sh,i)); break
-    progress_end()
+    sv=[]; total_vc=0
+    for obj in sl:
+        sh=get_shape(obj)
+        sc=get_skin_cluster(sh) if sh else ""
+        if not sc: continue
+        jl=get_joint_list_from_sc(sc)
+        vc=cmds.polyEvaluate(sh,vertex=True); total_vc+=vc
+        all_weights = _bulk_get_weights(sc, sh, vc, len(jl))
+        for i in range(vc):
+            if all_weights:
+                wl = all_weights[i]
+            else:
+                wl = cmds.skinPercent(sc, "{0}.vtx[{1}]".format(sh,i), q=True, v=True)
+            for w in wl:
+                ws = "{0:.10f}".format(w).rstrip("0")
+                if "." in ws and len(ws.split(".")[1]) > max_places:
+                    sv.append("{0}.vtx[{1}]".format(sh,i)); break
     elapsed = time.time() - st
     if sv:
         cmds.select(sv, r=True)
         show_status("Found {0} vertices finer than {1}".format(len(sv), unit))
     else:
         show_status("Check Pass (unit: {0})".format(unit))
-    show_check_result("Weight Decimal Check", len(sv), vc,
-                      "Unit: {0}\nTime: {1:.2f}s".format(unit, elapsed))
+    show_check_result("Weight Decimal Check", len(sv), total_vc,
+                      "Meshes: {0}\nUnit: {1}\nTime: {2:.2f}s".format(len(sl), unit, elapsed))
     return 1
 
 
@@ -2278,50 +2277,50 @@ def _unit_to_places(unit):
 
 
 def clean_weight_digit(unit=0.01):
-    """Round all skin weights to the specified unit."""
+    """Round all skin weights to the specified unit. Multi-mesh support."""
     places = _unit_to_places(unit)
     sl=cmds.filterExpand(sm=12) or []
     if not sl: show_status("No skinned mesh selected",True); return 0
-    sh=get_shape(sl[0]); sc=get_skin_cluster(sh)
-    if not sc: show_status("No skinCluster",True); return 0
-    joints = get_joint_list_from_sc(sc)
-    if not joints: show_status("No joints",True); return 0
     st=time.time()
-    vc=cmds.polyEvaluate(sh,vertex=True); fixed=0
-    progress_start("Cleaning weights...",vc)
-    cmds.setAttr(sc+".normalizeWeights",0)
-    for i in range(vc):
-        progress_update(1,"Clean {0}/{1}".format(i+1,vc))
-        vt="{0}.vtx[{1}]".format(sh,i)
-        wl=cmds.skinPercent(sc,vt,q=True,v=True)
-        new_w = []
-        needs_fix = False
-        for w in wl:
-            rw = round(w, places)
-            if rw < unit: rw = 0.0
-            if abs(rw - w) > 1e-12: needs_fix = True
-            new_w.append(rw)
-        if not needs_fix: continue
-        total = sum(new_w)
-        if total > 0:
-            new_w = [w / total for w in new_w]
-            new_w = [round(w, places) for w in new_w]
-            diff = 1.0 - sum(new_w)
-            if abs(diff) > 1e-12:
-                max_i = new_w.index(max(new_w))
-                new_w[max_i] = round(new_w[max_i] + diff, places)
-        else:
-            new_w[0] = 1.0
-        tv = [(joints[j], new_w[j]) for j in range(min(len(joints), len(new_w)))]
-        cmds.skinPercent(sc, vt, r=False, transformValue=tv)
-        fixed += 1
-    cmds.setAttr(sc+".normalizeWeights",1)
-    progress_end()
+    total_vc=0; total_fixed=0
+    for obj in sl:
+        sh=get_shape(obj)
+        sc=get_skin_cluster(sh) if sh else ""
+        if not sc: continue
+        joints = get_joint_list_from_sc(sc)
+        if not joints: continue
+        vc=cmds.polyEvaluate(sh,vertex=True); total_vc+=vc
+        cmds.setAttr(sc+".normalizeWeights",0)
+        for i in range(vc):
+            vt="{0}.vtx[{1}]".format(sh,i)
+            wl=cmds.skinPercent(sc,vt,q=True,v=True)
+            new_w = []
+            needs_fix = False
+            for w in wl:
+                rw = round(w, places)
+                if rw < unit: rw = 0.0
+                if abs(rw - w) > 1e-12: needs_fix = True
+                new_w.append(rw)
+            if not needs_fix: continue
+            total = sum(new_w)
+            if total > 0:
+                new_w = [w / total for w in new_w]
+                new_w = [round(w, places) for w in new_w]
+                diff = 1.0 - sum(new_w)
+                if abs(diff) > 1e-12:
+                    max_i = new_w.index(max(new_w))
+                    new_w[max_i] = round(new_w[max_i] + diff, places)
+            else:
+                new_w[0] = 1.0
+            tv = [(joints[j], new_w[j]) for j in range(min(len(joints), len(new_w)))]
+            cmds.skinPercent(sc, vt, r=False, transformValue=tv)
+            total_fixed += 1
+        cmds.setAttr(sc+".normalizeWeights",1)
     elapsed=time.time()-st
-    show_status("Cleaned {0}/{1} vertices (unit: {2})".format(fixed, vc, unit))
+    show_status("Cleaned {0}/{1} vertices (unit: {2})".format(total_fixed, total_vc, unit))
     cmds.confirmDialog(title="Weight Clean",
-                       message="Cleaned {0} / {1} vertices.\nUnit: {2}\nTime: {3:.2f}s".format(
-                           fixed, vc, unit, elapsed),
+                       message="Cleaned {0} / {1} vertices.\nMeshes: {2}\nUnit: {3}\nTime: {4:.2f}s".format(
+                           total_fixed, total_vc, len(sl), unit, elapsed),
                        button=["OK"], icon="information")
     return 1
 
@@ -2885,16 +2884,14 @@ class DoraSkinWeightUI(object):
         root=cmds.columnLayout(adj=True)
 
         # === Header ===
-        cmds.rowLayout(nc=5, adj=2, h=30, bgc=(0.22,0.22,0.22),
-                       cat=[(1,'left',6),(3,'right',4),(4,'right',4),(5,'right',6)],
-                       cw=[(1,100),(3,60),(4,80),(5,80)])
-        cmds.text(label=tr("lang_label"), fn="smallPlainLabelFont")
-        self.lang_menu=cmds.optionMenu(h=22,w=80,cc=self._on_lang)
-        cmds.menuItem(label="English"); cmds.menuItem(label="\u65e5\u672c\u8a9e")
-        if _LANG=="ja": cmds.optionMenu(self.lang_menu,e=True,sl=2)
+        cmds.rowLayout(nc=4, adj=2, h=30, bgc=(0.22,0.22,0.22),
+                       cat=[(1,'left',6),(2,'left',4),(3,'right',4),(4,'right',6)],
+                       cw=[(1,60),(3,60),(4,80)])
+        _lang_btn_label = "English" if _LANG == "ja" else "\u65e5\u672c\u8a9e"
+        cmds.button(label=_lang_btn_label, h=22, w=60, c=lambda *a: self._toggle_lang())
+        cmds.text(label="")
         cmds.button(label="Update",h=22,w=60,c=lambda*a:check_for_update())
         cmds.button(label=tr("how_to_use"),h=22,w=80,c=lambda*a:self._htu())
-        cmds.text(label="")
         cmds.setParent(root)
 
         # === Status bar ===
@@ -3080,8 +3077,9 @@ class DoraSkinWeightUI(object):
         print("Dora SkinWeight Tools Py v"+VERSION)
 
     # -- Language --
-    def _on_lang(self, v):
-        set_language("ja" if v=="\u65e5\u672c\u8a9e" else "en")
+    def _toggle_lang(self):
+        new_lang = "en" if _LANG == "ja" else "ja"
+        set_language(new_lang)
         cmds.evalDeferred(self.show)
 
     def _htu(self):

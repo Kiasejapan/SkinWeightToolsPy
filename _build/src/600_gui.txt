@@ -26,16 +26,14 @@ class DoraSkinWeightUI(object):
         root=cmds.columnLayout(adj=True)
 
         # === Header ===
-        cmds.rowLayout(nc=5, adj=2, h=30, bgc=(0.22,0.22,0.22),
-                       cat=[(1,'left',6),(3,'right',4),(4,'right',4),(5,'right',6)],
-                       cw=[(1,100),(3,60),(4,80),(5,80)])
-        cmds.text(label=tr("lang_label"), fn="smallPlainLabelFont")
-        self.lang_menu=cmds.optionMenu(h=22,w=80,cc=self._on_lang)
-        cmds.menuItem(label="English"); cmds.menuItem(label="\u65e5\u672c\u8a9e")
-        if _LANG=="ja": cmds.optionMenu(self.lang_menu,e=True,sl=2)
+        cmds.rowLayout(nc=4, adj=2, h=30, bgc=(0.22,0.22,0.22),
+                       cat=[(1,'left',6),(2,'left',4),(3,'right',4),(4,'right',6)],
+                       cw=[(1,60),(3,60),(4,80)])
+        _lang_btn_label = "English" if _LANG == "ja" else "\u65e5\u672c\u8a9e"
+        cmds.button(label=_lang_btn_label, h=22, w=60, c=lambda *a: self._toggle_lang())
+        cmds.text(label="")
         cmds.button(label="Update",h=22,w=60,c=lambda*a:check_for_update())
         cmds.button(label=tr("how_to_use"),h=22,w=80,c=lambda*a:self._htu())
-        cmds.text(label="")
         cmds.setParent(root)
 
         # === Status bar ===
@@ -221,8 +219,9 @@ class DoraSkinWeightUI(object):
         print("Dora SkinWeight Tools Py v"+VERSION)
 
     # -- Language --
-    def _on_lang(self, v):
-        set_language("ja" if v=="\u65e5\u672c\u8a9e" else "en")
+    def _toggle_lang(self):
+        new_lang = "en" if _LANG == "ja" else "ja"
+        set_language(new_lang)
         cmds.evalDeferred(self.show)
 
     def _htu(self):
