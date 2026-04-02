@@ -60,6 +60,12 @@ class DoraSkinWeightUI(object):
         self.ir1=cmds.radioButton(label="XYZ",sl=True,en=False,h=20)
         self.ir2=cmds.radioButton(label="UV",en=False,h=20)
         self.bcb=cmds.checkBox(label=tr("bind_skin"),v=False,h=20)
+        # Round weights option
+        _round_l = "\u30a6\u30a7\u30a4\u30c8\u4e38\u3081" if _LANG == "ja" else "Round weights"
+        self.imp_round_cb=cmds.checkBox(label=_round_l,v=True,h=20,
+                                         onc=lambda*a:cmds.floatField(self.imp_round_f,e=True,en=True),
+                                         ofc=lambda*a:cmds.floatField(self.imp_round_f,e=True,en=False))
+        self.imp_round_f=cmds.floatField(v=0.01,pre=4,w=70,h=20,min=0.0001,max=1.0)
         bj=cmds.button(label=tr("edit_jointmap"),h=24,w=130,c=lambda*a:self._jne())
         bi=cmds.button(label=tr("import_dsw"),h=28,c=lambda*a:self._do_imp())
         sp=cmds.separator(h=8,st="in")
@@ -67,7 +73,8 @@ class DoraSkinWeightUI(object):
         cmds.formLayout(ifl,e=True,
             af=[(il,"top",8),(il,"left",4),(il,"right",4),(self.il,"left",4),(self.il,"right",4),
                 (iml,"left",4),(r1,"left",4),(r2,"left",4),(r3,"left",4),(al,"left",4),
-                (self.icb,"left",4),(self.bcb,"left",4),(bj,"left",4),
+                (self.icb,"left",4),(self.bcb,"left",4),
+                (self.imp_round_cb,"left",4),(bj,"left",4),
                 (bi,"left",4),(bi,"right",4),(sp,"left",4),(sp,"right",4),
                 (bv,"left",4),(bv,"right",4),(bv,"bottom",4)],
             ac=[(self.il,"top",2,il),(self.il,"bottom",4,iml),
@@ -76,7 +83,10 @@ class DoraSkinWeightUI(object):
                 (self.icb,"bottom",6,self.bcb),
                 (self.ir1,"left",8,self.icb),(self.ir1,"bottom",6,self.bcb),
                 (self.ir2,"left",4,self.ir1),(self.ir2,"bottom",6,self.bcb),
-                (self.bcb,"bottom",6,bj),(bj,"bottom",6,bi),(bi,"bottom",4,sp),(sp,"bottom",4,bv)])
+                (self.bcb,"bottom",6,self.imp_round_cb),
+                (self.imp_round_cb,"bottom",6,bj),
+                (self.imp_round_f,"left",8,self.imp_round_cb),(self.imp_round_f,"bottom",6,bj),
+                (bj,"bottom",6,bi),(bi,"bottom",4,sp),(sp,"bottom",4,bv)])
         cmds.setParent("..")
 
         # ---- Export ----
@@ -274,7 +284,11 @@ class DoraSkinWeightUI(object):
         iim=1 if cmds.radioButton(self.ir1,q=True,sl=True) else 2
         ac=cmds.floatField(self.af,q=True,v=True)
         bs=cmds.checkBox(self.bcb,q=True,v=True)
-        mw=cmds.floatField(self.ctf,q=True,v=True) if cmds.floatField(self.ctf,exists=True) else 0.01
+        # Round weights: 0 = disabled
+        if cmds.checkBox(self.imp_round_cb,q=True,v=True):
+            mw=cmds.floatField(self.imp_round_f,q=True,v=True)
+        else:
+            mw=0
         dsw_import(dn,self.import_mode,ip,iim,ac,bs,self._gjm(),min_w=mw,show_report=True); self._rl()
 
     def _do_exp(self, mode):

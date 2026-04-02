@@ -19,7 +19,7 @@ import maya.mel as mel
 import maya.OpenMaya as om
 import maya.OpenMayaAnim as oma
 
-VERSION = "4.2.0.260401.1744"
+VERSION = "4.2.0.260402.1143"
 DSW_FORMAT_HEADER = "DoraYuki Skin Weight Format 3.00"
 
 # ============================================================================
@@ -2771,34 +2771,40 @@ def check_for_update():
     try:
         first_chunk = _url_read(_GITHUB_RAW_URL, max_bytes=3000)
     except Exception as e:
-        cmds.confirmDialog(title="Update Check",
-                           message="Could not connect to GitHub.\n{0}".format(e),
+        _conn_err = "\u63a5\u7d9a\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002\n{0}".format(e) if _LANG == "ja" else "Could not connect to GitHub.\n{0}".format(e)
+        cmds.confirmDialog(title="Update", message=_conn_err,
                            button=["OK"], icon="warning")
         return
 
     remote_ver = _extract_remote_version(first_chunk)
     if not remote_ver:
-        cmds.confirmDialog(title="Update Check",
-                           message="Could not determine remote version.\nCheck your internet connection.",
+        _no_ver = "\u30ea\u30e2\u30fc\u30c8\u30d0\u30fc\u30b8\u30e7\u30f3\u3092\u53d6\u5f97\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002" if _LANG == "ja" else "Could not determine remote version."
+        cmds.confirmDialog(title="Update", message=_no_ver,
                            button=["OK"], icon="warning")
         return
 
     local_ver = VERSION
 
     if remote_ver == local_ver:
-        cmds.confirmDialog(title="Update Check",
-                           message="You are up to date!\nVersion: {0}".format(local_ver),
+        _uptodate = "\u6700\u65b0\u7248\u3067\u3059\u3002\n\u30d0\u30fc\u30b8\u30e7\u30f3: {0}".format(local_ver) if _LANG == "ja" else "You are up to date!\nVersion: {0}".format(local_ver)
+        cmds.confirmDialog(title="Update", message=_uptodate,
                            button=["OK"], icon="information")
         show_status("Up to date: v{0}".format(local_ver))
         return
 
-    _msg = "New version available!\n\nLocal:  {0}\nRemote: {1}\n\nDownload and install?".format(
-        local_ver, remote_ver)
-    result = cmds.confirmDialog(title="Update Check", message=_msg,
-                                 button=["Download", "Cancel"],
-                                 defaultButton="Download",
-                                 cancelButton="Cancel", icon="question")
-    if result != "Download":
+    if _LANG == "ja":
+        _msg = "\u65b0\u3057\u3044\u30d0\u30fc\u30b8\u30e7\u30f3\u304c\u3042\u308a\u307e\u3059\uff01\n\n\u73fe\u5728: {0}\n\u6700\u65b0: {1}\n\n\u30c0\u30a6\u30f3\u30ed\u30fc\u30c9\u3057\u307e\u3059\u304b\uff1f".format(local_ver, remote_ver)
+        _dl_l = "\u30c0\u30a6\u30f3\u30ed\u30fc\u30c9"
+        _cancel_l = "\u30ad\u30e3\u30f3\u30bb\u30eb"
+    else:
+        _msg = "New version available!\n\nLocal:  {0}\nRemote: {1}\n\nDownload?".format(local_ver, remote_ver)
+        _dl_l = "Download"
+        _cancel_l = "Cancel"
+    result = cmds.confirmDialog(title="Update", message=_msg,
+                                 button=[_dl_l, _cancel_l],
+                                 defaultButton=_dl_l,
+                                 cancelButton=_cancel_l, icon="question")
+    if result != _dl_l:
         return
 
     # Download full file
@@ -2832,16 +2838,39 @@ def check_for_update():
             with open(dest, "w", encoding="utf-8") as f:
                 f.write(full_data)
 
-        _done_msg = "Updated to v{0}!\n\nSaved: {1}\n\nReload with:\nimport importlib\nimport DoraSkinWeightToolsPy\nimportlib.reload(DoraSkinWeightToolsPy)\nDoraSkinWeightToolsPy.launch()".format(
-            remote_ver, dest)
-        cmds.confirmDialog(title="Update Check",
+        if _LANG == "ja":
+            _done_msg = "v{0} \u306b\u66f4\u65b0\u3057\u307e\u3057\u305f\uff01\n\n\u4fdd\u5b58\u5148: {1}\n\n\u30ea\u30ed\u30fc\u30c9\u3057\u307e\u3059\u304b\uff1f".format(
+                remote_ver, dest)
+        else:
+            _done_msg = "Updated to v{0}!\n\nSaved: {1}\n\nReload now?".format(
+                remote_ver, dest)
+        _reload_l = "\u30ea\u30ed\u30fc\u30c9" if _LANG == "ja" else "Reload"
+        _later_l = "\u5f8c\u3067" if _LANG == "ja" else "Later"
+        result2 = cmds.confirmDialog(title="Update",
                            message=_done_msg,
-                           button=["OK"], icon="information")
+                           button=[_reload_l, _later_l],
+                           defaultButton=_reload_l,
+                           cancelButton=_later_l, icon="information")
         show_status("Updated to v{0}".format(remote_ver))
+        if result2 == _reload_l:
+            cmds.evalDeferred(_reload_tool)
     except Exception as e:
-        cmds.confirmDialog(title="Update Check",
-                           message="Save failed.\n{0}".format(e),
+        _save_err = "\u4fdd\u5b58\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002\n{0}".format(e) if _LANG == "ja" else "Save failed.\n{0}".format(e)
+        cmds.confirmDialog(title="Update", message=_save_err,
                            button=["OK"], icon="warning")
+
+
+def _reload_tool():
+    """Reload DoraSkinWeightToolsPy and relaunch UI."""
+    try:
+        if PY2:
+            reload(sys.modules["DoraSkinWeightToolsPy"])
+        else:
+            import importlib
+            importlib.reload(sys.modules["DoraSkinWeightToolsPy"])
+        sys.modules["DoraSkinWeightToolsPy"].launch()
+    except Exception as e:
+        cmds.warning("Reload failed: {0}".format(e))
 # ============================================================================
 # DSW List
 # ============================================================================
@@ -2918,6 +2947,12 @@ class DoraSkinWeightUI(object):
         self.ir1=cmds.radioButton(label="XYZ",sl=True,en=False,h=20)
         self.ir2=cmds.radioButton(label="UV",en=False,h=20)
         self.bcb=cmds.checkBox(label=tr("bind_skin"),v=False,h=20)
+        # Round weights option
+        _round_l = "\u30a6\u30a7\u30a4\u30c8\u4e38\u3081" if _LANG == "ja" else "Round weights"
+        self.imp_round_cb=cmds.checkBox(label=_round_l,v=True,h=20,
+                                         onc=lambda*a:cmds.floatField(self.imp_round_f,e=True,en=True),
+                                         ofc=lambda*a:cmds.floatField(self.imp_round_f,e=True,en=False))
+        self.imp_round_f=cmds.floatField(v=0.01,pre=4,w=70,h=20,min=0.0001,max=1.0)
         bj=cmds.button(label=tr("edit_jointmap"),h=24,w=130,c=lambda*a:self._jne())
         bi=cmds.button(label=tr("import_dsw"),h=28,c=lambda*a:self._do_imp())
         sp=cmds.separator(h=8,st="in")
@@ -2925,7 +2960,8 @@ class DoraSkinWeightUI(object):
         cmds.formLayout(ifl,e=True,
             af=[(il,"top",8),(il,"left",4),(il,"right",4),(self.il,"left",4),(self.il,"right",4),
                 (iml,"left",4),(r1,"left",4),(r2,"left",4),(r3,"left",4),(al,"left",4),
-                (self.icb,"left",4),(self.bcb,"left",4),(bj,"left",4),
+                (self.icb,"left",4),(self.bcb,"left",4),
+                (self.imp_round_cb,"left",4),(bj,"left",4),
                 (bi,"left",4),(bi,"right",4),(sp,"left",4),(sp,"right",4),
                 (bv,"left",4),(bv,"right",4),(bv,"bottom",4)],
             ac=[(self.il,"top",2,il),(self.il,"bottom",4,iml),
@@ -2934,7 +2970,10 @@ class DoraSkinWeightUI(object):
                 (self.icb,"bottom",6,self.bcb),
                 (self.ir1,"left",8,self.icb),(self.ir1,"bottom",6,self.bcb),
                 (self.ir2,"left",4,self.ir1),(self.ir2,"bottom",6,self.bcb),
-                (self.bcb,"bottom",6,bj),(bj,"bottom",6,bi),(bi,"bottom",4,sp),(sp,"bottom",4,bv)])
+                (self.bcb,"bottom",6,self.imp_round_cb),
+                (self.imp_round_cb,"bottom",6,bj),
+                (self.imp_round_f,"left",8,self.imp_round_cb),(self.imp_round_f,"bottom",6,bj),
+                (bj,"bottom",6,bi),(bi,"bottom",4,sp),(sp,"bottom",4,bv)])
         cmds.setParent("..")
 
         # ---- Export ----
@@ -3132,7 +3171,11 @@ class DoraSkinWeightUI(object):
         iim=1 if cmds.radioButton(self.ir1,q=True,sl=True) else 2
         ac=cmds.floatField(self.af,q=True,v=True)
         bs=cmds.checkBox(self.bcb,q=True,v=True)
-        mw=cmds.floatField(self.ctf,q=True,v=True) if cmds.floatField(self.ctf,exists=True) else 0.01
+        # Round weights: 0 = disabled
+        if cmds.checkBox(self.imp_round_cb,q=True,v=True):
+            mw=cmds.floatField(self.imp_round_f,q=True,v=True)
+        else:
+            mw=0
         dsw_import(dn,self.import_mode,ip,iim,ac,bs,self._gjm(),min_w=mw,show_report=True); self._rl()
 
     def _do_exp(self, mode):
