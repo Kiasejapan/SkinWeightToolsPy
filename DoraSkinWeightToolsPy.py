@@ -19,7 +19,7 @@ import maya.mel as mel
 import maya.OpenMaya as om
 import maya.OpenMayaAnim as oma
 
-VERSION = "4.2.0.260402.1156"
+VERSION = "4.2.0.260402.1723"
 DSW_FORMAT_HEADER = "DoraYuki Skin Weight Format 3.00"
 
 # ============================================================================
@@ -3283,8 +3283,10 @@ class DoraSkinWeightUI(object):
 
             row = cmds.rowLayout(nc=4, adj=1, h=26, cw=[(2, 140), (3, 28), (4, 28)])
 
+            def _make_sel_cb(jp):
+                return lambda *a: self._cw_select_joint(jp)
             cmds.button(label=display, al="left", h=24,
-                        c=lambda *a, jp=jpath: self._cw_select_joint(jp))
+                        c=_make_sel_cb(jpath))
 
             menu = cmds.optionMenu(h=22, w=140)
             for mid in CAGE_MODE_ORDER:
