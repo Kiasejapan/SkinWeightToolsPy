@@ -1,5 +1,98 @@
 # DoraSkinWeightToolsPy
 
+Skin weight management tool for Maya (Python Edition).
+Provides DSW format weight import/export, cage weight auto-generation, same-position check, and more in a single file.
+
+---
+
+## Installation
+
+### 1. Download DoraSkinWeightToolsPy
+
+Right-click the link below and select **"Save link as..."** to download.
+
+> **[DoraSkinWeightToolsPy.py](https://github.com/Kiasejapan/SkinWeightToolsPy/raw/refs/heads/main/DoraSkinWeightToolsPy.py)**
+
+### 2. Place the file
+
+Copy `DoraSkinWeightToolsPy.py` to your Maya scripts folder:
+
+```
+C:\Users\<username>\Documents\maya\scripts\
+```
+
+> Mac: `~/Library/Preferences/Autodesk/maya/<version>/scripts/`
+
+### 3. Launch in Maya
+
+Open Script Editor (Windows > General Editors > Script Editor).
+Switch to the Python tab and run:
+
+```python
+import DoraSkinWeightToolsPy
+DoraSkinWeightToolsPy.launch()
+```
+
+### 4. Reload after update (optional)
+
+```python
+# Maya 2022+
+import importlib
+import DoraSkinWeightToolsPy
+importlib.reload(DoraSkinWeightToolsPy)
+DoraSkinWeightToolsPy.launch()
+```
+
+```python
+# Maya 2018
+import DoraSkinWeightToolsPy
+reload(DoraSkinWeightToolsPy)
+DoraSkinWeightToolsPy.launch()
+```
+
+### Shelf Button (optional)
+
+1. Open Script Editor
+2. Type the launch command above (Python)
+3. Select the text and middle-mouse-drag it to your shelf
+
+---
+
+## Compatibility
+
+* Maya 2018 – 2025
+* Python 2.7 (Maya 2018-2019) / Python 3.x (Maya 2020+)
+
+---
+
+## Features
+
+* **Import / Export** — DSW format skin weights (Vertex Order / XYZ / UV matching)
+* **Vertex Paste** — Apply weights to selected vertices only
+* **Body Fit** — Match skeleton A to skeleton B by joint name
+* **Cage Weight (BETA)** — Auto-generate skin weights along bone chains
+* **Data Check** — Weight decimal check/clean, influence count check, same-position weight check
+* **Update** — One-click update from GitHub via the in-tool Update button
+* **Bilingual UI** — English / Japanese toggle
+
+---
+
+## In-Tool Update
+
+Click the **Update** button in the tool window to check for new versions on GitHub.
+If a newer version is found, it will be downloaded, installed, and reloaded automatically.
+
+---
+
+## License
+
+Based on DoraSkinWeightImpExp.mel by DoraYuki.
+
+---
+---
+
+# DoraSkinWeightToolsPy（日本語）
+
 Maya 用スキンウェイト管理ツール（Python Edition）です。
 DSW 形式でのウェイト入出力、ケージウェイト自動生成、同位置チェックなどを 1 ファイルで提供します。
 
