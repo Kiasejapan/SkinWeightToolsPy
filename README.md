@@ -33,23 +33,6 @@ import DoraSkinWeightToolsPy
 DoraSkinWeightToolsPy.launch()
 ```
 
-### 4. Reload after update (optional)
-
-```python
-# Maya 2022+
-import importlib
-import DoraSkinWeightToolsPy
-importlib.reload(DoraSkinWeightToolsPy)
-DoraSkinWeightToolsPy.launch()
-```
-
-```python
-# Maya 2018
-import DoraSkinWeightToolsPy
-reload(DoraSkinWeightToolsPy)
-DoraSkinWeightToolsPy.launch()
-```
-
 ### Shelf Button (optional)
 
 1. Open Script Editor
@@ -123,23 +106,6 @@ Maya を起動し、Script Editor（スクリプトエディター）を開き�
 
 ```python
 import DoraSkinWeightToolsPy
-DoraSkinWeightToolsPy.launch()
-```
-
-### 4. ファイル更新後のリロード（任意）
-
-```python
-# Maya 2022+
-import importlib
-import DoraSkinWeightToolsPy
-importlib.reload(DoraSkinWeightToolsPy)
-DoraSkinWeightToolsPy.launch()
-```
-
-```python
-# Maya 2018
-import DoraSkinWeightToolsPy
-reload(DoraSkinWeightToolsPy)
 DoraSkinWeightToolsPy.launch()
 ```
 
